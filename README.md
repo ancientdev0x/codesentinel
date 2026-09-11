@@ -1,32 +1,39 @@
-# CodeSentinel 🚢
+# Helps you ship faster 🚢
 
-> **An extensible, AI-powered code review and QA agent built on [flue](https://github.com/withastro/flue).**
+Shippie is an extendable code-review agent. It runs an agent loop that reads your diff, explores the codebase with real developer tools, and posts focused review comments — picking up issues a human reviewer would, such as:
 
-CodeSentinel runs autonomous agent workflows to review pull requests, identify bugs, test critical user flows via browser automation, and post actionable inline code suggestions directly to GitHub or your local terminal.
+- Exposed secrets
+- Slow or inefficient code
+- Potential bugs or unhandled edge cases
+
+Shippie can also act as a Model Context Protocol (MCP) client to reach external tools like browser automation, observability and documentation.
+
+## Demo
+
+https://github.com/user-attachments/assets/code-review-gpt-3.mp4
+
+## Ethos 💭
+
+- **A prebuilt review workflow, not a bespoke CLI** — the agent loop runs on flue + pi.
+- **Runs anywhere**: Node, Cloudflare, GitHub Actions, GitLab CI.
+- **Functions as a human code reviewer**, using flue's built-in tools instead of a hand-rolled tool registry.
+- **Provider-agnostic**: Anthropic, OpenAI, OpenRouter, and Cloudflare Workers AI out of the box.
+- **Acts as an MCP client** for integration with external tools.
 
 ---
 
-## ✨ Features
+## Quick start 🚀
 
-- 🔍 **Intelligent Code Review**: Analyzes git diffs, project guidelines (`AGENTS.md` / `CLAUDE.md`), and custom instructions to provide contextual, high-signal reviews.
-- 💬 **Inline Suggestions**: Posts line-level code suggestions via GitHub review comments with ready-to-commit patches.
-- 🧪 **Ambient QA & Flow Testing**: Discovers and runs automated browser tests using Chrome DevTools Protocol (CDP) to verify UI flows and report findings.
-- 🔌 **Model Context Protocol (MCP)**: Connect remote HTTP/SSE MCP servers to equip CodeSentinel with custom tools and live external documentation.
-- 🌐 **Multi-Model Provider Support**: First-class support for Anthropic (`claude-sonnet-4-6`), OpenAI (`gpt-4.1-mini`, `gpt-5`), OpenRouter, and Cloudflare Workers AI / AI Gateway.
-- 💻 **Run Anywhere**: Use as a GitHub Action on Pull Requests, locally against staged files (`git diff --cached`), or as a standalone HTTP server.
+### GitHub Action
 
----
-
-## 🚀 Quickstart: GitHub Action
-
-Add CodeSentinel to your repository in `.github/workflows/codesentinel.yml`:
+Run `npx shippie init` to scaffold the workflow below, then add your provider API key as a repo secret. Or add it manually — it needs a full checkout (`fetch-depth: 0`), PR write permissions, and a provider API key.
 
 ```yaml
-name: CodeSentinel Review
+# .github/workflows/shippie.yml
+name: Shippie
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
 
 permissions:
   pull-requests: write
@@ -36,156 +43,76 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Full history required for git diff
-
-      - name: Run CodeSentinel
-        uses: ancientdev0x/CodeSentinel@main
-        with:
-          MODEL: "anthropic/claude-sonnet-4-6"
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          fetch-depth: 0
+      - uses: mattzcarey/shippie@v0
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
----
+See [Action Options](docs/action-options.md) for all inputs (`MODEL`, `THINKING_LEVEL`, `IGNORE`, `CUSTOM_INSTRUCTIONS`, `MCP_SERVERS`, and the provider keys).
 
-## 💻 Local CLI Usage
+### Local
 
-You can review uncommitted or staged changes locally before opening a pull request.
-
-### 1. Installation
-
-Requires **Node.js >= 22.19.0**:
+Run the review workflow locally with no server. Local mode reviews your staged changes (`git diff --cached`) and writes results to `.shippie/review/local_*.md`:
 
 ```bash
-git clone https://github.com/ancientdev0x/CodeSentinel.git
-cd CodeSentinel
-npm install
+npx shippie review
 ```
 
-### 2. Environment Configuration
+### Run on demand with `/shippie`
 
-Create a `.env` file in the root directory:
-
-```env
-CodeSentinel_MODEL=anthropic/claude-sonnet-4-6
-ANTHROPIC_API_KEY=your-anthropic-api-key
-```
-
-### 3. Run Review
-
-Stage the files you want reviewed and execute:
-
-```bash
-git add .
-npm run review
-```
-
-Review feedback and inline suggestions will be output to `.CodeSentinel/review/local_*.md`.
+Comment `/shippie review` on a pull request to run shippie on demand — either via a GitHub Actions workflow (no server) or a deployed webhook channel. See [Run Shippie on demand](docs/tag-shippie.md).
 
 ---
 
-## ⚙️ Configuration & Inputs
+## Setup Instructions 💫
 
-### GitHub Action Inputs
+See the [setup instructions](docs/setup.md) for more docs on how to set up shippie in your CI/CD pipeline and run it locally.
 
-| Input | Default | Description |
-| :--- | :--- | :--- |
-| `MODEL` | `anthropic/claude-sonnet-4-6` | Model identifier in `provider/model` format |
-| `REVIEW_LANGUAGE` | `English` | Language for review feedback |
-| `THINKING_LEVEL` | `medium` | Reasoning effort: `off` \| `minimal` \| `low` \| `medium` \| `high` \| `xhigh` |
-| `IGNORE` | — | Comma-separated glob patterns to exclude (e.g. `**/*.test.ts,dist/**`) |
-| `CUSTOM_INSTRUCTIONS`| — | Custom prompt instructions appended to reviewer instructions |
-| `MCP_SERVERS` | — | JSON string specifying remote MCP servers |
-| `GITHUB_TOKEN` | — | **Required**. GitHub token for posting review comments |
-| `ANTHROPIC_API_KEY` | — | API key for Anthropic models |
-| `OPENAI_API_KEY` | — | API key for OpenAI models |
-| `OPENROUTER_API_KEY` | — | API key for OpenRouter models |
-| `CLOUDFLARE_API_KEY` | — | API token for Cloudflare Workers AI / AI Gateway |
+### Additional Documentation
 
-### Model Providers
-
-| Provider | Example Model Specifier | Required Credentials |
-| :--- | :--- | :--- |
-| **Anthropic** | `anthropic/claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
-| **OpenAI** | `openai/gpt-4.1-mini`, `openai/gpt-5` | `OPENAI_API_KEY` |
-| **OpenRouter** | `openrouter/anthropic/claude-3.7-sonnet` | `OPENROUTER_API_KEY` |
-| **Cloudflare Workers AI** | `cloudflare-workers-ai/@cf/openai/gpt-oss-120b` | `CLOUDFLARE_API_KEY`, `CLOUDFLARE_ACCOUNT_ID` |
-| **Cloudflare AI Gateway** | `cloudflare-ai-gateway/<model>` | `CLOUDFLARE_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_GATEWAY_ID` |
+- [Setup](docs/setup.md) - Get shippie running in CI and locally
+- [AI Provider Configuration](docs/ai-provider-config.md) - Configure Anthropic, OpenAI, OpenRouter, and Cloudflare Workers AI
+- [Action Options](docs/action-options.md) - GitHub Action configuration options
+- [Model Context Protocol (MCP)](docs/mcp.md) - Give shippie access to external tools
+- [Rules Files](docs/rules-files.md) - Inject project context via AGENTS.md / CLAUDE.md and Agent Skills
+- [Subagent Tool](docs/subagent-tool.md) - Delegate work to flue subagents with the task tool
+- [On-demand /shippie](docs/tag-shippie.md) - Run shippie by commenting /shippie (Actions or webhook)
 
 ---
 
-## 🔌 Connecting MCP (Model Context Protocol)
+## Development 🔧
 
-Attach remote MCP servers over HTTP/SSE via the `MCP_SERVERS` input or `CodeSentinel_MCP_SERVERS` environment variable:
+This repo targets Node >= 22.19 with npm.
 
-```yaml
-- name: Run CodeSentinel with MCP
-  uses: ancientdev0x/CodeSentinel@main
-  with:
-    MODEL: anthropic/claude-sonnet-4-6
-    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    MCP_SERVERS: |
-      {
-        "context7": {
-          "url": "https://mcp.context7.ai/sse",
-          "headers": {
-            "Authorization": "Bearer ${{ secrets.CONTEXT7_API_KEY }}"
-          }
-        }
-      }
-```
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/mattzcarey/shippie.git
+   cd shippie
+   ```
 
----
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-## 🏗️ Repository Architecture
+3. **Set up your API key:**
+   - Copy `.env.example` to `.env`.
+   - Set the provider key you want to use, e.g. `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID`).
 
-```
-CodeSentinel/
-├── action.yml               # Composite GitHub Action entrypoint
-├── flue.config.ts           # Flue runtime configuration
-├── src/
-│   ├── agents/              # Flue agents (reviewer, QA lead, mentions)
-│   ├── workflows/           # Orchestrated workflows (review, QA)
-│   ├── tools/               # Agent tools (suggest_change, classify_finding, run_spec)
-│   ├── review/              # Diff parsing, context building, filtering, prompt generation
-│   ├── qa/                  # Ambient QA runner, flow catalogs, self-healing tests
-│   ├── github/              # Octokit client and review reporting logic
-│   └── mcp/                 # Model Context Protocol remote connection manager
-├── tests/                   # Vitest unit and integration test suites
-├── apps/                    # Web apps and Cloudflare server workers
-└── docs/                    # In-depth architectural & user guides
-```
+4. **Run the review workflow:**
+   ```bash
+   npm run review
+   ```
 
----
+5. **Useful commands:**
+   - `npm run dev` — run flue in dev mode
+   - `npm run build` — build a publishable Node server to `dist/server.mjs` (run it with `npm run start`, then `POST /workflows/review?wait=result`)
+   - `npm run check` — lint with oxlint + check formatting with oxfmt
+   - `npm run check:types` — typecheck with tsc
+   - `npm test` — run tests
 
-## 🛠️ Development & Testing
-
-```bash
-# Install dependencies
-npm install
-
-# Run type check
-npm run check:types
-
-# Run linter and formatting check
-npm run check
-
-# Auto-fix linting and formatting
-npm run check:fix
-
-# Run tests
-npm test
-
-# Build production bundle
-npm run build
-```
-
----
-
-## 📄 License
-
-MIT License © 2026 [ancientdev0x](https://github.com/ancientdev0x).
+See `package.json` for the full list of scripts.
