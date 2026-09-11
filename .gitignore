@@ -1,0 +1,38 @@
+node_modules
+.idea
+.env
+dist
+**/.cache/*.ts
+!jest.config.js
+*.d.ts
+# apps/* are Cloudflare Workers; their generated env types are committed + referenced by tsconfig
+!apps/**/worker-configuration.d.ts
+
+# Cloudflare / wrangler (apps/*)
+.wrangler
+.turbo
+.dev.vars
+.dev.vars.*
+
+**/data
+
+cdk.context.json
+
+# nextjs and sst
+.next
+.sst
+!.sst/types/index.ts
+!sst-env.d.ts
+.open-next
+.DS_Store
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out/
+cdk.context.json
+
+# PEM
+*.pem
+
+# TypeScript build cache
+*.tsbuildinfo

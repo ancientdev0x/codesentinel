@@ -1,0 +1,26 @@
+{
+    "name": "CodeSentinel-telemetry",
+    "main": "src/index.ts",
+    "compatibility_date": "2025-04-04",
+    "observability": {
+        "enabled": true
+    },
+    // "r2_buckets": [
+    //     {
+    //         "bucket_name": "CodeSentinel-events",
+    //         "binding": "CodeSentinel_events"
+    //     }
+    // ],
+    "pipelines": [
+        {
+            "pipeline": "CodeSentinel-telemetry",
+            "binding": "TELEMETRY_PIPELINE"
+        }
+    ],
+    "routes": [
+        {
+            "pattern": "telemetry.CodeSentinel.dev",
+            "custom_domain": true
+        }
+    ]
+}

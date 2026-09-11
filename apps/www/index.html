@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Set Kumo color mode before paint to avoid a flash.
+      (function () {
+        try {
+          var stored = localStorage.getItem("mode");
+          var mode = stored === "light" || stored === "dark" ? stored : "light";
+          document.documentElement.setAttribute("data-mode", mode);
+        } catch (e) {
+          document.documentElement.setAttribute("data-mode", "light");
+        }
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link href="/src/styles.css" rel="stylesheet">
+    <title>CodeSentinel — the AI code reviewer that clears your code to merge</title>
+    <meta
+      name="description"
+      content="CodeSentinel is an open-source, extendable AI code review agent. It runs on your pull requests or locally, posts focused inline review comments, and catches bugs, secrets, and missing tests."
+    />
+    <meta property="og:title" content="CodeSentinel — an extendable AI code review agent" />
+    <meta
+      property="og:description"
+      content="An open-source AI code review agent that runs on your pull requests or locally and posts focused inline review comments."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://CodeSentinel.dev" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

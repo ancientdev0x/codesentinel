@@ -1,0 +1,217 @@
+# CodeSentinel QA — Feature Overview
+
+The authoritative answer to *"what can the CodeSentinel QA agent do, and how does it work?"*
+
+---
+
+## 1. What it is
+
+**CodeSentinel QA is an autonomous, ambient end-to-end QA agent.** It is a prebuilt [flue](https://github.com/earendil-works/flue) agent (running on the `@earendil-works/pi-ai` provider) that explores a running product, catalogs its real user flows, fans out a fleet of subagents to QA each flow in parallel, and writes **dependency-free e2e tests that run with just `node`** (no Playwright, no install step). When it finds a broken flow it attempts a minimal source fix plus a failing→passing regression test, and it opens **tiered pull requests** for the coverage it added and the bugs it fixed. It runs three ways from one codebase: as a **scheduled + on-demand GitHub Action** (`ancientdev0x/CodeSentinel/qa@v0`), **locally** via `CodeSentinel qa`, or as a **Docker monolith** image. It QAs two target kinds — **web** products (drives headless Chrome over the Chrome DevTools Protocol) and **CLI/terminal** products (drives the target's CLI via bash).
+
+---
+
+## 2. Agent architecture
+
+### The lead + its subagents
+
+The run is a single flue agent — the **QA lead** (`src/agents/qa-lead.ts`, depth 0) — that fans out to two subagent **profiles** (depth-1 siblings): a kind-aware driver (`src/qa/driver.ts`) and the healer. All model strings resolve centrally through `src/common/models.ts` — no model is hardcoded per-agent (see §6). The "Model default" column below is the **zero-config** model; setting `CodeSentinel_MODEL` (or `CodeSentinel_QA_MODEL`) moves the whole system.
+
+| Agent | File | Model default | Thinking | Role |
+|-------|------|---------------|----------|------|
+| **qa-lead** | `src/agents/qa-lead.ts` | `anthropic/claude-opus-4-8` (`CodeSentinel_QA_MODEL`→`CodeSentinel_MODEL`) | high | Explores, catalogs flows, fans out, classifies findings, opens PRs. Owns the lead-only tools. |
+| **browser-driver** / **cli-driver** | `src/qa/driver.ts` (one factory, kind-picked) | `anthropic/claude-sonnet-4-6` (inherits the lead; override `CodeSentinel_QA_DRIVER_MODEL`) | medium | Drives ONE flow — web: its own headless Chrome over CDP → `.cdp.mjs`; cli: the target CLI via bash → `.cli.mjs` — writes + self-verifies the test, returns a JSON verdict. |
+| **healer** | `src/qa/healer.ts` | = the lead model (judgment tier) | high | Repairs ONE broken flow — minimal source fix + a failing→passing regression test, verified green. The headline capability, so it runs on the lead model. |
+
+> **Why the subagent profiles live in `src/qa/` and not `src/agents/`:** flue auto-discovers every `src/agents/*.ts` as a top-level agent that must default-export `createAgent()`. A subagent profile is not that — it is built with `defineAgentProfile` and passed to the lead's `subagents: [...]`. Putting these in `src/agents/` would crash the flue server at boot.
+
+All three drivers/healer are *always declared* on the lead's `subagents`; which one the lead delegates to is chosen by `cfg.kind` in the kind-branched instructions and kickoff prompt. Subagents do **not** inherit the lead's instructions or custom tools — each carries its own full rubric, and each is given **only** the `run_spec` tool (plus the always-present built-ins: `bash`/`read`/`write`/`edit`/`grep`/`glob`). `catalog_flows`, `classify_finding`, and `open_pull_request` stay **lead-only**.
+
+### The loop
+
+```
+explore  →  catalog flows  →  fan out drivers (parallel)  →  run_spec (self-verify green)
+   →  heal broken flows  →  classify every finding  →  open tiered PR(s)  →  finish (JSON)
+```
+
+1. **EXPLORE** — read README/AGENTS.md/routes/package.json; activate the `chrome-cdp` skill (web) or run the CLI via `bash` (cli) to confirm the target is reachable and learn resilient selectors / real output before delegating.
+2. **CATALOG** — call `catalog_flows`, which writes the backlog to `e2e/specs/<slug>.md` (one human-readable doc per flow: slug, title, priority, steps, expected outcomes). This is both the work backlog and a review artifact.
+3. **FAN OUT** — for each catalogued flow, emit a `task` call to the right driver. **Parallelism with a throttle:** multiple `task` calls in a single turn run in parallel, capped at **≤3 per turn** to bound Chrome memory; more than 3 flows run in successive batches. Each driver works alone, launches its own browser/runs the CLI, writes `e2e/tests/<slug>.{cdp,cli}.mjs`, verifies it green with `run_spec`, and returns a JSON verdict.
+4. **COLLECT** — the lead reads every verdict (`pass` / `broken` / `flaky`). It may re-run a suspect spec itself with `run_spec`. A flow counts as covered only if its driver returned `pass`.
+5. **HEAL** — for each `broken` flow (same ≤3/turn throttle), the lead delegates to a `healer`, which root-causes in the repo (white-box to fix, black-box to test), makes the smallest correct source change, writes/repairs the regression test failing→passing, and verifies it green. If it genuinely cannot fix the app, it leaves the source untouched, writes a repro spec that captures the broken state, and returns a precise "needs human" diagnosis.
+6. **CLASSIFY** — call `classify_finding` for *every* finding to get its accepted tier (the mechanical PR bar; see §4).
+7. **OPEN PRs** — `open_pull_request` once per accepted finding: a missing-coverage PR for the green specs, a broken-flow PR per healed flow, and a refactor-hint PR only when the classifier accepts it.
+8. **FINISH** — the lead ends its turn with a single JSON result object (`flowsCatalogued`, `results`, `passed`, `broken`, `healed`, `prUrl`, `prUrls`, `summary`).
+
+### The flue task-tool fan-out
+
+Fan-out uses flue's built-in `task` tool: `agent: "browser-driver" | "cli-driver" | "healer"` plus a `prompt` that gives the subagent everything it needs to work alone (the flow slug, a unique `FLOW_INDEX`, the full spec pasted inline, and the base URL / build+run command). The lead deliberately **omits `cwd`** on `task` calls so each child inherits `cfg.workspace` — which is where `.agents/skills/chrome-cdp` and `e2e/cdp-client.mjs` (or `e2e/cli-client.mjs`) were materialized — so the chrome-cdp skill auto-discovers and the test's `../cdp-client.mjs` import resolves.
+
+### The `local()` sandbox
+
+The lead runs in flue's `local()` sandbox (`@flue/runtime/node`) rooted at `cfg.workspace`: host filesystem + real `bash` (on macOS/Linux; on Windows flue's bash is cmd.exe, which the chrome-cdp skill cannot use — the agent reports the limitation instead). `local()` env is an **allowlist snapshot**, so the lead explicitly passes:
+
+- `CHROME_BIN` — so the agent's bash can launch the right browser,
+- `CDP_IGNORE_CERT_ERRORS=1` — so the agent and the tests can load external HTTPS behind TLS-inspecting proxies / self-signed certs,
+- `CI=1`.
+
+### Compaction & durability
+
+- **Compaction:** `{ keepRecentTokens: 6000 }` on the lead — screenshots are heavy in context, so old turns are compacted aggressively.
+- **Durability:** `{ timeoutMs: 75 * 60_000 }` (75 min) — deliberately sized below the GitHub Actions hosted-runner ceiling (6h) and the author job's 90-min `timeout-minutes`. Subagent profiles reject `durability`, so it lives only on the lead.
+
+---
+
+## 3. The two target kinds
+
+The kind (`QaKind` in `src/qa/config.ts`) is `'web'` by default; `'cli'` only when explicitly requested (payload `kind` or `CodeSentinel_QA_KIND=cli`). The heal/classify/tiered-PR structure is identical for both — only the driver, the developer tool, and the committed test shape differ.
+
+### `web` — headless Chrome over CDP (default)
+
+The agent's **interactive tool** is the vendored `chrome-cdp` skill (`src/skills/chrome-cdp/`), materialized into `<workspace>/.agents/skills/chrome-cdp/` at run start so flue auto-discovers it. It is a dependency-free CLI (Node 22+ built-in WebSocket — no MCP, no Puppeteer/Playwright):
+
+```
+node .agents/skills/chrome-cdp/scripts/cdp.mjs --port $PORT <command> <target>
+```
+
+`bash .agents/skills/chrome-cdp/scripts/launch-chrome.sh "$PORT"` launches headless Chrome detached (setsid on Linux, nohup+disown on macOS) so it survives across bash calls; `cdp.mjs` runs as a per-port daemon (each `node cdp.mjs <cmd>` is a fresh client process talking to the backgrounded Chrome over a unix socket). Commands include `list / snap (accessibility tree) / nav / fill / click / clickxy / type / press / eval / html / net / shot / evalraw / stop`. `snap` is the recommended way to learn resilient role/name/label selectors. Parallel drivers use a unique port per flow (`9222 + FLOW_INDEX`).
+
+**Committed tests** are node scripts at `e2e/tests/<slug>.cdp.mjs` importing `../cdp-client.mjs` (`src/skills/chrome-cdp/scripts/cdp-client.mjs`, materialized to `e2e/cdp-client.mjs`). The `cdp-client` is a dependency-free driver — `open()` launches its **own** headless Chrome (so the test self-launches; you never launch Chrome inside a test) and returns a driver with:
+
+`open / goto / url / title / text / html / eval / fill / type / click / clickAt / press / waitFor / waitForText / snapshot / shot / close`
+
+Notable cdp-client behaviors:
+
+- **Screencast → mp4:** records a screencast by default and `close()` assembles `session.mp4` via ffmpeg (degrades to leaving frames if ffmpeg is absent). `close()` also tears down Chrome.
+- **Viewports:** `open({ viewport })` or `$E2E_VIEWPORT` accepts `"1280x900"`, `"375x812@2"` (with deviceScaleFactor), or a preset — `mobile` (390×844@3), `tablet` (820×1180@2), `desktop` (1280×900@1) — applied via `Emulation.setDeviceMetricsOverride`. The per-run browser size is the one thing that changes per web target, with no test edit.
+- **External HTTPS cert tolerance:** cert-tolerant for external HTTPS (`CDP_IGNORE_CERT_ERRORS`), so it loads sites behind corporate TLS-inspecting proxies / self-signed certs.
+- **Black-box discipline (enforced by the rubric):** drive only public surfaces (URL/UI/HTTP); never import app internals; relative `goto` paths so the same test runs against any `E2E_BASE_URL`; assert on user-visible values; wait on conditions (`waitFor`/`waitForText`), never sleep; one journey per test; match rendered (CSS-transformed) text case-insensitively or assert on stable attributes.
+
+#### Session capture v0 (the web authoring path)
+
+The intended authoring flow for web tests is **record-while-driving → gen-test → faithful test**. When `$CDP_RECORD=<path>` is set, `cdp.mjs` appends one JSON line per *successful* mutating/navigating command to a JSONL log (recordable ops: `nav`, `fill`, `click`, `type`, `press`, `clickxy` — written under their `cdp-client` method names, e.g. `clickxy → clickAt`, `nav → nav`). Recording is best-effort and never throws, so a log-write failure cannot break the live drive. A companion `gen-test.mjs` turns that log into a faithful `e2e/tests/<slug>.cdp.mjs`. (The record half is built in the vendored `cdp.mjs`; `gen-test.mjs` is the in-progress other half — see §8.)
+
+### `cli` — terminal / CLI
+
+There is **no browser, no chrome-cdp skill, no cdp-client** here: the agent's developer tool is the built-in `bash`. The driver builds the target if needed (`cargo build --release`, `npm run build`, `go build`, `make`) and runs the CLI directly to learn its real behavior (help text, output format, exit codes, stderr-on-error).
+
+**Committed tests** are node scripts at `e2e/tests/<slug>.cli.mjs` importing `../cli-client.mjs` (`src/qa/cli-client.mjs`, materialized to `e2e/cli-client.mjs`). The `cli-client` is dependency-free (node:child_process only) and exports:
+
+- **`run(command, args?, opts?)`** — spawns NO shell (argv verbatim, no injection surprises). Never rejects on a nonzero exit (the exit code is the assertion target); rejects only on ENOENT (cannot spawn) or timeout. Resolves `{ stdout, stderr, code, signal, timedOut }`. `opts`: `{ cwd, env, input, timeoutMs }` — `cwd` defaults to `$E2E_CWD` (the target checkout) then `process.cwd()`; default timeout 60s; output capped at ~16 MiB/stream.
+- **`runShell(commandString, opts?)`** — `sh -c <commandString>` for pipes/globs/`&&`; use only when the scenario genuinely needs shell features.
+
+The CLI rubric mirrors the web one: drive only the public CLI surface (command, args, stdin, exit code, stdout/stderr); never import target internals; resolve paths relative to `E2E_CWD`; assert on exit code (`r.code`) and stdout/stderr matched case-insensitively or with stable substrings; one scenario per test; the test source IS the review artifact.
+
+> Both kinds run with **just `node`** and no install — the verify job globs `e2e/tests/*.mjs` (both `.cdp.mjs` and `.cli.mjs`).
+
+---
+
+## 4. PR tiers (`decideTier`)
+
+The PR bar is **mechanical, not vibes** — `decideTier` in `src/qa/pr-policy.ts`, exposed to the lead as the `classify_finding` tool. Every finding must be classified before a PR is opened, and a PR is opened only for an *accepted* finding.
+
+| Tier | Bar | What ships | Branch / dedupe |
+|------|-----|-----------|-----------------|
+| **broken-flow** | **Always accepted** | The healer's source fix **together with** the failing→passing regression test + the flow's spec doc. For `fixed:false`, a repro spec + a clear "needs human" callout. | Stable per-flow branch `CodeSentinel-qa/fix/<slug>` (NOT week-stamped, so a bug accumulates onto ONE healing PR until merged). Deduped by `flowSlug`: a `[flow:<slug>]` title marker + an open-PR title search means re-running never opens a 2nd PR for the same broken flow — it updates the existing one. |
+| **missing-coverage** | **LOW bar** — any new green spec is accepted | All green test files for passing flows + their `e2e/specs/<slug>.md` docs. | Iso-week branch `CodeSentinel-qa/<year>-W<week>` (e.g. `CodeSentinel-qa/2026-W26`). Weekly re-runs accumulate onto the same week's PR; successive weeks make distinct reviewable PRs. |
+| **refactor-hint** | **VERY HIGH bar** — rejected unless `pressingNeed: true` **AND** severity is `blocker`/`high` | Only opened if `classify_finding` accepted it (refactor PRs go stale fast, so it is off by default). | Iso-week branch. |
+
+PRs are committed via the Octokit git database API (blob → tree → commit → ref) — **no local git credentials** needed, and an identical (content-addressed) tree is detected as an **empty diff and skipped**. Any committed test auto-includes its dependency-free driver as a sibling (`.cdp.mjs → e2e/cdp-client.mjs`, `.cli.mjs → e2e/cli-client.mjs`) so the suite runs standalone in the verify job. The `open_pull_request` tool also persists its result to `.CodeSentinel/qa/last-pr.json` so the Action's output seam (`branch`/`changed`/`pr_url`) reads it back robustly rather than parsing stdout.
+
+---
+
+## 5. How to run it
+
+### Locally — `CodeSentinel qa`
+
+`bin/CodeSentinel.mjs qa` boots the bundled flue server (`dist/server.mjs`) on a random local port, POSTs `POST /workflows/qa?wait=result` once with `{ platform: 'local', workspace: cwd }`, prints the JSON result, and exits. Config comes from the environment (see §6). For a web target set `CodeSentinel_QA_TARGET`; for a CLI/lib target set `CodeSentinel_QA_KIND=cli`. (A `local` run has no GitHub target, so it does not open PRs — `openOrUpdatePr` returns `"no github target (local run)"`.)
+
+```bash
+# web target
+export ANTHROPIC_API_KEY=...
+CodeSentinel_QA_TARGET=http://localhost:5173 CodeSentinel qa
+
+# CLI/lib target
+CodeSentinel_QA_KIND=cli CodeSentinel qa
+```
+
+### The GitHub Action — `ancientdev0x/CodeSentinel/qa@v0`
+
+The composite action `qa/action.yml` runs on Node 22, installs CodeSentinel (`--include=dev` so `@flue/cli` is present), then runs `npx flue run qa --root "$ROOT" --target node --payload '{"platform":"github","workspace":"$GITHUB_WORKSPACE"}'`. It exposes outputs `branch` / `changed` / `pr_url` / `base_url` read back from `.CodeSentinel/qa/last-pr.json`.
+
+`CodeSentinel qa init` scaffolds `.github/workflows/CodeSentinel-qa.yml` (+ an `e2e/.gitignore` ignoring `.artifacts/`). The scaffolded workflow has two jobs:
+
+- **author** (ubuntu, 90-min timeout, holds the model key) — runs the agent and opens the PR.
+- **verify** (no agent, no key) — checks out the PR branch and re-runs the committed tests with plain `node` + system Chrome + ffmpeg, uploading `e2e/.artifacts/` (screenshots, `session.mp4`). The PR's own checks prove the suite green.
+
+It runs **weekly** (`cron: "0 6 * * 1"`, Mondays 06:00 UTC) and **on demand** (`workflow_dispatch` with `target` / `scope` / `model` inputs). Add `--cross-os` to scaffold a 3-OS verify matrix (ubuntu + windows + macos), installing Chrome + ffmpeg per-OS and uploading per-OS artifacts.
+
+```bash
+CodeSentinel qa init                 # weekly + on-demand QA workflow
+CodeSentinel qa init --cross-os      # + verify on ubuntu + windows + macos
+gh workflow run CodeSentinel-qa.yml -f target=https://your-app.example.com
+```
+
+### Cross-repo fan-out — `CodeSentinel qa fanout-init`
+
+For QAing many repos you own from one control repo. `CodeSentinel qa fanout-init [owner/repoA,owner/repoB ...]` scaffolds `.github/workflows/CodeSentinel-qa-fanout.yml` into the *control* repo. On a schedule + on demand it dispatches **each target repo's own `CodeSentinel-qa.yml`** — it never pushes or opens PRs in the targets; each target runs under its **own `GITHUB_TOKEN`**.
+
+The cross-repo credential is a **GitHub App installation token** (`actions/create-github-app-token@v1`), minted per-shard scoped to a single repo with **`actions:write` only** — all that "create a workflow dispatch event" needs. (The default repo-scoped `GITHUB_TOKEN` cannot dispatch other repos.) Setup: create a GitHub App with Repository → Actions: Read and write, install it on every target, and store its App ID as the `QA_APP_ID` repo variable + private key as the `QA_APP_PRIVATE_KEY` secret in the control repo. Each target needs its own `CodeSentinel-qa.yml`, its model key, and "Allow GitHub Actions to create and approve pull requests".
+
+There is also a **reusable workflow**, `.github/workflows/qa-reusable.yml` (`workflow_call`), so a target can run QA as a thin caller (`uses: ancientdev0x/CodeSentinel/.github/workflows/qa-reusable.yml@v0`) and pick up central version bumps via the `@v0` tag. (The reusable workflow runs the ubuntu-only verify leg; for cross-OS verification keep the inlined workflow.)
+
+### The Docker monolith
+
+One image — `node:22-bookworm-slim` + Chromium + flue + the agent + the `src/skills` source that `materializeSkill()` copies at run start — is identical locally and in CI (`Dockerfile` at the repo root). `tini` is PID 1 to reap Chrome zombies. The entrypoint does **not** launch Chrome (the agent's bash launches Chrome per-flow on its own port; a single image-launched Chrome on 9222 would collide with the fan-out). `--no-sandbox --disable-dev-shm-usage` are mandatory in-container (root + small `/dev/shm`), or run `--shm-size=1g`. `docker run --rm -e ANTHROPIC_API_KEY -e GITHUB_TOKEN CodeSentinel-qa <args>` locally equals the CI step byte-for-byte. (GitHub Actions `jobs.<id>.container` is Linux-only, so the Linux author leg can run inside the image while Windows/macOS verify legs run on bare runners.)
+
+---
+
+## 6. Configuration knobs
+
+Resolved by `resolveQaConfig` (`src/qa/config.ts`) from the workflow **payload** and the **environment** (payload wins). It reuses `resolveReviewConfig` for the shared fields (platform/workspace/telemetry/mcp), then resolves the GitHub target **without a PR number** (QA opens PRs; it does not review an existing one).
+
+**Models are configured centrally** in `src/common/models.ts` — the single place model defaults and env precedence live; nothing hardcodes a model string. `CodeSentinel_MODEL` alone configures the whole system (review + QA lead + drivers + healer + the `/CodeSentinel` mention agent); each role then has one documented override (`CodeSentinel_QA_MODEL` for the lead/healer, `CodeSentinel_QA_DRIVER_MODEL` for the drivers) that falls back to it. Zero-config keeps the opus-lead / sonnet-driver cost split; set `CodeSentinel_MODEL=<provider/model>` and every agent follows it.
+
+| Knob | Payload field | Env var(s) | Default |
+|------|---------------|-----------|---------|
+| Model (lead + healer) | `model` | `CodeSentinel_QA_MODEL` → `CodeSentinel_MODEL` | `anthropic/claude-opus-4-8` |
+| Driver model | `driverModel` | `CodeSentinel_QA_DRIVER_MODEL` → `CodeSentinel_QA_MODEL` → `CodeSentinel_MODEL` | `anthropic/claude-sonnet-4-6` |
+| Thinking level | `thinkingLevel` | `CodeSentinel_QA_THINKING_LEVEL` | `high` |
+| Target kind | `kind` | `CodeSentinel_QA_KIND` (`cli` to switch) | `web` |
+| Target under test | `target` | `CodeSentinel_QA_TARGET` | none (web: boot a dev server; cli: detect/build) |
+| Scope / focus | `scope` | `CodeSentinel_QA_SCOPE` | none |
+| PR branch override | `branch` | `CodeSentinel_QA_BRANCH` | iso-week (or per-flow for broken-flow) |
+| Viewport (web) | `viewport` | `CodeSentinel_QA_VIEWPORT` | client default (1280×900) |
+| Chrome binary | `chromeBin` | `CHROME_BIN` | OS default (`/Applications/Google Chrome.app/...` on macOS, `google-chrome` on Linux, `chrome` on Windows) |
+| Workspace | `workspace` | `GITHUB_WORKSPACE` → cwd | cwd |
+| Telemetry | `telemetry` | `CodeSentinel_TELEMETRY` | `true` (set false to opt out) |
+| MCP servers | `mcpServers` | — | none |
+| Platform | `platform` | (auto: `github` in Actions, else `local`) | `local` |
+
+**Target = empty:** web → the agent detects how to boot the app (e.g. a `dev` script), starts it in the background, polls the port, and uses that local URL. cli → the agent detects how to build + invoke the CLI (README, `bin`, `Cargo.toml`, Makefile).
+
+**Viewport** accepts `"1280x900"`, `"375x812@2"`, or `mobile|tablet|desktop` → `E2E_VIEWPORT` for the specs.
+
+**External HTTPS:** `CDP_IGNORE_CERT_ERRORS=1` is set for both the agent's interactive browser and the `run_spec` test runs, so external HTTPS behind TLS-inspecting proxies / self-signed certs loads.
+
+The GitHub Action also accepts the provider keys (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID`) and a required `GITHUB_TOKEN`.
+
+---
+
+## 7. Robustness
+
+- **pi-ai transient-retry patch — retired in the flue beta.9 migration.** It was pinned to `@earendil-works/pi-ai@0.79.10`; flue beta.9 requires `pi-ai@^0.80.2` (for its `./compat` subpath), so the 0.79.10 patch no longer applies and was removed along with the version override. Re-creating the env-tunable retry (`PI_AI_RETRY_ATTEMPTS` / `PI_AI_RETRY_BASE_MS`) against pi-ai 0.80.x — if 0.80.x does not already retry transient 5xx/429s natively — is a tracked follow-up.
+- **Boot-check** — `pr.yml` runs a CI boot-smoke (`node dist/server.mjs`) to catch the agent-discovery-at-boot class of failures (e.g. a subagent profile mistakenly placed in `src/agents/` that crashes the server at boot).
+- **Gates** — the QA features were each built through an orchestrated workflow (research → partitioned implement → verify) gated by the boot-check and the test/lint gates before commit. `qa-smoke.yml` is a throwaway CDP feasibility probe (launch headless Chrome, reach the CDP ws endpoint, drive one command) across ubuntu/windows/macos with no API key or repo access.
+- **Verify job** re-runs every committed test with plain `node` + system Chrome (no agent, no key) so a PR's checks independently prove the suite green — and on `--cross-os`, on three OSes.
+
+---
+
+## 8. Roadmap / not-yet
+
+- **Remote execution is LOCAL-ONLY today** — headless Chrome + bash on a GitHub Action runner is the only backend, and the agent loop hard-wires it (no provider indirection). The single planned remote backend is the **Cloudflare Sandbox SDK** (`@cloudflare/sandbox`): a sandboxed container exposing a terminal, ports, and a preview URL. No provider-abstraction code ships for it yet — an interface with one identity-passthrough impl plus a throw-stub would be premature, so the seam will be (re)introduced as real code only when that backend is actually built (see the `docs/ambient-qa.md` change log).
+- **Session capture is web-only for now.** The record half (`$CDP_RECORD` JSONL log in `cdp.mjs`) is built; the `gen-test.mjs` log→faithful-spec generator is the in-progress other half. **Session capture for the `cli` kind is future.**
+- **refactor-hint tier** ships but is off by default (very high bar) and is the least-exercised tier.
+
+---
+
+*Key source files: `src/agents/qa-lead.ts`; `src/qa/{config,instructions,driver,healer,pr,pr-policy,skill,exec,catalog,cli-client.mjs}.ts` (`driver.ts` is the single kind-aware driver profile — a `browser-driver` for web, a `cli-driver` for cli); `src/tools/{catalog-flows,run-spec,classify-finding,open-pull-request}.ts`; `src/workflows/qa.ts`; `bin/CodeSentinel.mjs` + `bin/templates.mjs` + `bin/templates/{review,qa,fanout}.yml` (the scaffolded Actions workflows live as real YAML templates); `qa/action.yml`; `.github/workflows/{qa-reusable,qa-smoke}.yml`; `src/skills/chrome-cdp/{SKILL.md,scripts/cdp.mjs,scripts/cdp-client.mjs,scripts/launch-chrome.sh}`; `Dockerfile`. See also `docs/ambient-qa.md` (design log) and `docs/cross-repo-qa.md`.*

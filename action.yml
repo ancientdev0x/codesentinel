@@ -1,0 +1,110 @@
+name: "CodeSentinel 🚢"
+description: "an extensible code review agent built on flue"
+author: "CodeSentinel"
+inputs:
+  MODEL:
+    description: "Flue model specifier, e.g. anthropic/claude-sonnet-4-6, openai/gpt-5.5, openrouter/..."
+    required: false
+    default: "anthropic/claude-sonnet-4-6"
+  REVIEW_LANGUAGE:
+    description: "Target natural language for review feedback"
+    required: false
+    default: "English"
+  THINKING_LEVEL:
+    description: "Reasoning effort: off | minimal | low | medium | high | xhigh"
+    required: false
+    default: "medium"
+  IGNORE:
+    description: "Comma-separated glob patterns to ignore (e.g. '**/*.test.ts,dist/**')"
+    required: false
+  CUSTOM_INSTRUCTIONS:
+    description: "Extra instructions appended to the review prompt"
+    required: false
+  MCP_SERVERS:
+    description: >-
+      JSON object of remote MCP servers to attach, e.g.
+      '{"context7":{"url":"https://...","headers":{"Authorization":"Bearer ..."}}}'.
+      Only remote (HTTP/SSE) servers are supported.
+    required: false
+  ANTHROPIC_API_KEY:
+    description: "Anthropic API key"
+    required: false
+  OPENAI_API_KEY:
+    description: "OpenAI API key"
+    required: false
+  OPENROUTER_API_KEY:
+    description: "OpenRouter API key"
+    required: false
+  CLOUDFLARE_API_KEY:
+    description: "Cloudflare API token, for model 'cloudflare-workers-ai/<model>' or 'cloudflare-ai-gateway/<model>'"
+    required: false
+  CLOUDFLARE_ACCOUNT_ID:
+    description: "Cloudflare account ID (required for Cloudflare Workers AI / AI Gateway providers)"
+    required: false
+  CLOUDFLARE_GATEWAY_ID:
+    description: "Cloudflare AI Gateway ID (only for model 'cloudflare-ai-gateway/<model>')"
+    required: false
+  TELEMETRY:
+    description: "Send anonymous usage telemetry. Set to 'false' to opt out."
+    required: false
+    default: "true"
+  PR_NUMBER:
+    description: "Pull request number. Defaults to the pull_request event; pass explicitly for comment-triggered runs."
+    required: false
+  BASE_SHA:
+    description: "Base commit SHA to diff against. Defaults to the pull_request event."
+    required: false
+  HEAD_SHA:
+    description: "Head commit SHA to diff. Defaults to the pull_request event."
+    required: false
+  GITHUB_TOKEN:
+    description: "GitHub token used to post review comments"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - name: Install CodeSentinel
+      shell: bash
+      # --include=dev so @flue/cli (a devDependency, needed by `npx flue`) is
+      # installed even if the runner sets NODE_ENV=production.
+      run: npm install --prefix "$GITHUB_ACTION_PATH" --include=dev --no-audit --no-fund --loglevel=error
+
+    - name: Run CodeSentinel review 🚢
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        # Provider credentials (read by flue's model layer)
+        # `inputs.X || env.X`: support creds passed via `with:` OR inherited `env:`
+        # (the README/docs show both). Without the fallback, an unset input would
+        # clobber a caller-provided env var with an empty string.
+        ANTHROPIC_API_KEY: ${{ inputs.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY }}
+        OPENAI_API_KEY: ${{ inputs.OPENAI_API_KEY || env.OPENAI_API_KEY }}
+        OPENROUTER_API_KEY: ${{ inputs.OPENROUTER_API_KEY || env.OPENROUTER_API_KEY }}
+        CLOUDFLARE_API_KEY: ${{ inputs.CLOUDFLARE_API_KEY || env.CLOUDFLARE_API_KEY }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.CLOUDFLARE_ACCOUNT_ID || env.CLOUDFLARE_ACCOUNT_ID }}
+        CLOUDFLARE_GATEWAY_ID: ${{ inputs.CLOUDFLARE_GATEWAY_ID || env.CLOUDFLARE_GATEWAY_ID }}
+        # GitHub commenting + PR identity (read by resolveReviewConfig)
+        GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN || env.GITHUB_TOKEN }}
+        CodeSentinel_PR_NUMBER: ${{ inputs.PR_NUMBER || github.event.pull_request.number }}
+        BASE_SHA: ${{ inputs.BASE_SHA || github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ inputs.HEAD_SHA || github.event.pull_request.head.sha }}
+        # Review configuration
+        CodeSentinel_MODEL: ${{ inputs.MODEL }}
+        CodeSentinel_REVIEW_LANGUAGE: ${{ inputs.REVIEW_LANGUAGE }}
+        CodeSentinel_THINKING_LEVEL: ${{ inputs.THINKING_LEVEL }}
+        CodeSentinel_IGNORE: ${{ inputs.IGNORE }}
+        CodeSentinel_CUSTOM_INSTRUCTIONS: ${{ inputs.CUSTOM_INSTRUCTIONS }}
+        CodeSentinel_MCP_SERVERS: ${{ inputs.MCP_SERVERS }}
+        CodeSentinel_TELEMETRY: ${{ inputs.TELEMETRY }}
+      run: |
+        npx flue run review \
+          --root "$GITHUB_ACTION_PATH" \
+          --target node \
+          --payload "{\"platform\":\"github\",\"workspace\":\"$GITHUB_WORKSPACE\"}"
+branding:
+  icon: "git-pull-request"
+  color: "red"
