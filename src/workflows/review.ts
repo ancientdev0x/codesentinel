@@ -5,6 +5,7 @@ import type { AnalyzerReportRow } from '../common/formatting/summary'
 import { sendReviewStarted } from '../common/telemetry'
 import { createReporter } from '../github/reporter'
 import { flushTracing, initTracing } from '../observability/langfuse'
+import { tracedPrompt } from '../observability/tokens'
 import { runStaticAnalysis } from '../review/analyzers'
 import {
   applyPayloadToEnv,
@@ -156,7 +157,7 @@ export default defineWorkflow({
       // `result` schema: response_format/json_schema is not supported by every
       // provider (e.g. Cloudflare Workers AI returns 400), and a free-text final
       // message keeps the workflow model-agnostic.
-      const response = await session.prompt(prompt)
+      const response = await tracedPrompt(session, prompt, { model: cfg.model })
       const summary =
         response.text?.trim() ||
         'CodeSentinel completed the review; see the inline comments.'
