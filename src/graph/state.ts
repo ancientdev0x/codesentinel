@@ -59,7 +59,14 @@ export const ReviewState = new StateSchema({
   ),
   degraded: z.array(z.string()).default([]), // tools/stages skipped after unrecoverable failure
   recovery: z.custom<RecoveryPlan | null>().default(null),
-  approvals: z.record(z.string(), z.enum(['approve', 'reject'])).default({}), // E5
+  patches: z.array(z.custom<any>()).default([]),
+  approvals: z
+    .record(
+      z.string(),
+      z.union([z.enum(['approve', 'reject']), z.object({ edit: z.string() })])
+    )
+    .default({}), // E5
+  applied: z.array(z.string()).default([]),
   handledErrorCount: z.number().default(0),
 })
 
