@@ -109,6 +109,22 @@ runs:
       # installed even if the runner sets NODE_ENV=production.
       run: npm install --prefix "$GITHUB_ACTION_PATH" --include=dev --no-audit --no-fund --loglevel=error
 
+    - name: Build analyzer container
+      if: ${{ inputs.STATIC_ANALYSIS != 'false' }}
+      continue-on-error: true
+      shell: bash
+      run: |
+        docker build -t codesentinel-analyzers:0.1.0 \
+          -f "$GITHUB_ACTION_PATH/docker/analyzers.Dockerfile" \
+          "$GITHUB_ACTION_PATH/docker"
+
+    - name: Install fallback analyzers on host
+      if: ${{ inputs.STATIC_ANALYSIS != 'false' }}
+      continue-on-error: true
+      shell: bash
+      run: |
+        pipx install bandit==1.9.4 ruff==0.16.10
+
     - name: Run CodeSentinel review 🚢
       shell: bash
       working-directory: ${{ github.action_path }}

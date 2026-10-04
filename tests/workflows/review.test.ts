@@ -31,6 +31,13 @@ vi.mock('../../src/review/source', async (orig) => {
   }
 })
 
+const runStaticAnalysis = vi
+  .fn()
+  .mockResolvedValue({ findings: [], runs: [], reports: [] })
+vi.mock('../../src/review/analyzers', () => ({
+  runStaticAnalysis: (...args: unknown[]) => runStaticAnalysis(...args),
+}))
+
 import reviewWorkflow from '../../src/workflows/review'
 
 // flue beta.9: the workflow is defineWorkflow({ agent, run }). Its run handler lives
@@ -242,5 +249,57 @@ describe('review workflow run()', () => {
       expect.stringContaining('capping review at 300 files')
     )
     warnSpy.mockRestore()
+  })
+
+  it('runs static analysis and includes findings in prompt and analyzer report in summary', async () => {
+    getChangedFiles.mockResolvedValue({
+      files: [makeFile('app/server.py')],
+      rawDiff: 'raw',
+    })
+    runStaticAnalysis.mockResolvedValueOnce({
+      findings: [
+        {
+          id: 'cs-bandit-1234',
+          file: 'app/server.py',
+          startLine: 10,
+          endLine: 10,
+          ruleId: 'B602',
+          source: 'bandit',
+          severity: 'critical',
+          message: 'subprocess call with shell=True',
+        },
+      ],
+      runs: [],
+      reports: [
+        {
+          tool: 'bandit',
+          backend: 'docker',
+          status: 'ok',
+          findings: 1,
+          durationMs: 400,
+        },
+      ],
+    })
+    const { harness, session } = makeHarness()
+
+    await runWorkflow(harness, { platform: 'local', staticAnalysis: true })
+
+    expect(runStaticAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ staticAnalysis: true }),
+      ['app/server.py']
+    )
+    const promptArg = session.prompt.mock.calls[0][0] as string
+    expect(promptArg).toContain('cs-bandit-1234')
+    expect(promptArg).toContain('Pre-detected findings')
+
+    expect(postSummary).toHaveBeenCalledWith('SUMMARY', [
+      {
+        tool: 'bandit',
+        backend: 'docker',
+        status: 'ok',
+        findings: 1,
+        durationMs: 400,
+      },
+    ])
   })
 })

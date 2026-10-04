@@ -1,3 +1,4 @@
+import type { AnalyzerReportRow } from '../../common/formatting/summary'
 import { resolveSandboxBackend } from '../../sandbox/docker'
 import type { RunResult } from '../../sandbox/run'
 import type { ReviewConfig } from '../config'
@@ -11,6 +12,7 @@ export type AnalyzerToolName = 'bandit' | 'ruff' | 'tsc'
 export interface StaticAnalysisResult {
   findings: Finding[]
   runs: RunResult[]
+  reports: AnalyzerReportRow[]
 }
 
 /**
@@ -24,9 +26,10 @@ export const runStaticAnalysis = async (
 ): Promise<StaticAnalysisResult> => {
   const runs: RunResult[] = []
   const allFindings: Finding[] = []
+  const reports: AnalyzerReportRow[] = []
 
   if (!cfg.staticAnalysis || files.length === 0) {
-    return { findings: [], runs: [] }
+    return { findings: [], runs: [], reports: [] }
   }
 
   try {
@@ -44,12 +47,25 @@ export const runStaticAnalysis = async (
     const shouldRun = (tool: AnalyzerToolName) =>
       !requestedTools || requestedTools.includes(tool)
 
-    const tasks: Promise<{ findings: Finding[]; runResult?: RunResult }>[] = []
+    const tasks: Promise<{
+      tool: AnalyzerToolName
+      backend: string
+      findings: Finding[]
+      runResult?: RunResult
+    }>[] = []
 
     if (shouldRun('bandit') && pyFiles.length > 0) {
       tasks.push(
-        runBandit(pyFiles, cfg.workspace, backend, cfg.analyzerTimeoutMs).catch(
-          (err) => ({
+        runBandit(pyFiles, cfg.workspace, backend, cfg.analyzerTimeoutMs)
+          .then((res) => ({
+            tool: 'bandit' as const,
+            backend,
+            findings: res.findings,
+            runResult: res.runResult,
+          }))
+          .catch((err) => ({
+            tool: 'bandit' as const,
+            backend,
             findings: [],
             runResult: {
               status: 'error' as const,
@@ -57,36 +73,53 @@ export const runStaticAnalysis = async (
               stderr: String(err),
               durationMs: 0,
             },
-          })
-        )
+          }))
       )
     }
 
     if (shouldRun('ruff') && pyFiles.length > 0) {
       tasks.push(
-        runRuff(pyFiles, cfg.workspace, backend, cfg.analyzerTimeoutMs).catch((err) => ({
-          findings: [],
-          runResult: {
-            status: 'error' as const,
-            exitCode: null,
-            stderr: String(err),
-            durationMs: 0,
-          },
-        }))
+        runRuff(pyFiles, cfg.workspace, backend, cfg.analyzerTimeoutMs)
+          .then((res) => ({
+            tool: 'ruff' as const,
+            backend,
+            findings: res.findings,
+            runResult: res.runResult,
+          }))
+          .catch((err) => ({
+            tool: 'ruff' as const,
+            backend,
+            findings: [],
+            runResult: {
+              status: 'error' as const,
+              exitCode: null,
+              stderr: String(err),
+              durationMs: 0,
+            },
+          }))
       )
     }
 
     if (shouldRun('tsc') && tsFiles.length > 0) {
       tasks.push(
-        runTsc(tsFiles, cfg.workspace, cfg.analyzerTimeoutMs).catch((err) => ({
-          findings: [],
-          runResult: {
-            status: 'error' as const,
-            exitCode: null,
-            stderr: String(err),
-            durationMs: 0,
-          },
-        }))
+        runTsc(tsFiles, cfg.workspace, cfg.analyzerTimeoutMs)
+          .then((res) => ({
+            tool: 'tsc' as const,
+            backend: 'host',
+            findings: res.findings,
+            runResult: res.runResult,
+          }))
+          .catch((err) => ({
+            tool: 'tsc' as const,
+            backend: 'host',
+            findings: [],
+            runResult: {
+              status: 'error' as const,
+              exitCode: null,
+              stderr: String(err),
+              durationMs: 0,
+            },
+          }))
       )
     }
 
@@ -94,9 +127,17 @@ export const runStaticAnalysis = async (
 
     for (const res of settled) {
       if (res.status === 'fulfilled') {
-        allFindings.push(...res.value.findings)
-        if (res.value.runResult) {
-          runs.push(res.value.runResult)
+        const val = res.value
+        allFindings.push(...val.findings)
+        if (val.runResult) {
+          runs.push(val.runResult)
+          reports.push({
+            tool: val.tool,
+            backend: val.backend,
+            status: val.runResult.status,
+            findings: val.findings.length,
+            durationMs: 'durationMs' in val.runResult ? val.runResult.durationMs : 0,
+          })
         }
       }
     }
@@ -107,5 +148,6 @@ export const runStaticAnalysis = async (
   return {
     findings: dedupeFindings(allFindings),
     runs,
+    reports,
   }
 }

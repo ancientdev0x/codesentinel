@@ -32,7 +32,7 @@ and finish by returning a concise summary of the pull request's intent and risks
 // Rules for review
 - Functionality: ensure changes do not break existing behaviour; investigate when unsure.
 - Testing: flag missing or inadequate tests for the changed behaviour.
-- Security: flag secrets/API keys in plaintext and obvious injection/authz issues as highest risk.
+- Security: flag vulnerabilities across critical CWE categories (injection, deserialization, secrets, SSRF, path traversal, authz). Pre-detected findings must each be confirmed or dismissed with a reason (triage). Flag regressions (removed checks, changed error handling, broken call sites) as highest risk.
 - Best practices: clean, DRY, SOLID where applicable — but only raise issues you are confident about.
 - Brevity: keep comments short and specific. If many similar issues exist, comment on the most critical.
 - Confidence: do not comment on unfamiliar libraries unless you are sure there is a problem.

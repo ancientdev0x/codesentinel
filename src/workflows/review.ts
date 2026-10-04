@@ -1,8 +1,10 @@
 import { type JsonValue, type WorkflowRouteHandler, defineWorkflow } from '@flue/runtime'
 import * as v from 'valibot'
 import reviewer from '../agents/reviewer'
+import type { AnalyzerReportRow } from '../common/formatting/summary'
 import { sendReviewStarted } from '../common/telemetry'
 import { createReporter } from '../github/reporter'
+import { runStaticAnalysis } from '../review/analyzers'
 import {
   applyPayloadToEnv,
   type ReviewPayload,
@@ -11,6 +13,7 @@ import {
 import { runAstChecks } from '../review/ast/checks'
 import { extractAllFragments } from '../review/ast/fragments'
 import { buildReviewPrompt } from '../review/context'
+import { dedupeFindings, type Finding } from '../review/findings'
 import { type ReviewFileWithDiff, getChangedFiles } from '../review/diff'
 import { materializePr, parsePrUrl } from '../review/source'
 import { filterFiles } from '../review/utils/filterFiles'
@@ -124,12 +127,25 @@ export default defineWorkflow({
       const session = await harness.session()
 
       const fragments = cfg.astChecks ? extractAllFragments(filtered) : []
-      const findings = cfg.astChecks ? runAstChecks(filtered) : []
+      const astFindings = cfg.astChecks ? runAstChecks(filtered) : []
+
+      let analyzerFindings: Finding[] = []
+      let analyzerRows: AnalyzerReportRow[] = []
+
+      if (cfg.staticAnalysis) {
+        const filePaths = filtered.map((f) => f.fileName)
+        const analysis = await runStaticAnalysis(cfg, filePaths)
+        analyzerFindings = analysis.findings
+        analyzerRows = analysis.reports
+      }
+
+      const allFindings = dedupeFindings([...astFindings, ...analyzerFindings])
+
       const prompt = buildReviewPrompt(
         {
           files: filtered,
           fragments,
-          findings,
+          findings: allFindings,
           astChecks: cfg.astChecks,
         },
         cfg.workspace
@@ -144,7 +160,10 @@ export default defineWorkflow({
         'CodeSentinel completed the review; see the inline comments.'
 
       const reporter = createReporter(cfg)
-      const summaryUrl = await reporter.postSummary(summary)
+      const summaryUrl =
+        analyzerRows.length > 0
+          ? await reporter.postSummary(summary, analyzerRows)
+          : await reporter.postSummary(summary)
 
       return {
         reviewed: filtered.length,

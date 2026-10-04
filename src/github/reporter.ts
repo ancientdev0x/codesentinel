@@ -14,7 +14,10 @@ export interface ReviewCommentInput {
 /** Posts review output to GitHub (CI) or to a local file (dev). */
 export interface Reporter {
   postReviewComment: (input: ReviewCommentInput) => Promise<string | undefined>
-  postSummary: (comment: string) => Promise<string | undefined>
+  postSummary: (
+    comment: string,
+    analyzerRows?: import('../common/formatting/summary').AnalyzerReportRow[]
+  ) => Promise<string | undefined>
 }
 
 /** Make a workspace-absolute path relative to the repo root for the GitHub API. */
@@ -65,8 +68,8 @@ const createGithubReporter = (cfg: ReviewConfig): Reporter => {
       }
     },
 
-    postSummary: async (comment) => {
-      const body = formatSummary(comment)
+    postSummary: async (comment, analyzerRows) => {
+      const body = formatSummary(comment, analyzerRows)
       const { data: existing } = await octokit.rest.issues.listComments({
         owner,
         repo,
@@ -118,9 +121,9 @@ const createLocalReporter = (cfg: ReviewConfig): Reporter => {
       await appendFile(reviewFile, `### ${path}${loc}\n\n${comment}\n\n`)
       return `Comment written to ${reviewFile}`
     },
-    postSummary: async (comment) => {
+    postSummary: async (comment, analyzerRows) => {
       await ensureDir()
-      await appendFile(reviewFile, `${formatSummary(comment)}\n`)
+      await appendFile(reviewFile, `${formatSummary(comment, analyzerRows)}\n`)
       return `Summary written to ${reviewFile}`
     },
   }
@@ -168,19 +171,19 @@ export const fallbackOnForbidden = (primary: Reporter, fallback: Reporter): Repo
         throw err
       }
     },
-    postSummary: async (comment) => {
+    postSummary: async (comment, analyzerRows) => {
       if (switched) {
-        return fallback.postSummary(comment)
+        return fallback.postSummary(comment, analyzerRows)
       }
       try {
-        return await primary.postSummary(comment)
+        return await primary.postSummary(comment, analyzerRows)
       } catch (err) {
         if (isForbidden(err)) {
           switched = true
           console.warn(
             '[CodeSentinel] GITHUB_TOKEN does not have write access to post summary (HTTP 403). Falling back to local file output.'
           )
-          return fallback.postSummary(comment)
+          return fallback.postSummary(comment, analyzerRows)
         }
         throw err
       }
