@@ -34,6 +34,13 @@ export interface ReviewPayload {
   baseSha?: string
   headSha?: string
   mcpServers?: Record<string, McpServerInput>
+  prUrl?: string
+  staticAnalysis?: boolean
+  sandbox?: 'docker' | 'host' | 'auto'
+  analyzerTimeoutMs?: number
+  astChecks?: boolean
+  hitlMode?: 'off' | 'suggest' | 'interactive'
+  maxAttempts?: number
 }
 
 export interface GithubTarget {
@@ -56,6 +63,13 @@ export interface ReviewConfig {
   headSha?: string
   github?: GithubTarget
   mcpServers: Record<string, McpServerInput>
+  prUrl?: string
+  staticAnalysis: boolean
+  sandbox: 'docker' | 'host' | 'auto'
+  analyzerTimeoutMs: number
+  astChecks: boolean
+  hitlMode: 'off' | 'suggest' | 'interactive'
+  maxAttempts: number
 }
 
 const DEFAULT_THINKING: ThinkingLevel = 'medium'
@@ -125,6 +139,48 @@ export const resolveReviewConfig = (
     }
   }
 
+  const prUrl = p.prUrl ?? env.CodeSentinel_PR_URL ?? env.CODESENTINEL_PR_URL
+  const staticAnalysis =
+    p.staticAnalysis ??
+    (env.CodeSentinel_STATIC_ANALYSIS !== undefined
+      ? env.CodeSentinel_STATIC_ANALYSIS !== 'false'
+      : env.CODESENTINEL_STATIC_ANALYSIS !== undefined
+        ? env.CODESENTINEL_STATIC_ANALYSIS !== 'false'
+        : true)
+  const sandbox =
+    p.sandbox ??
+    ((env.CodeSentinel_SANDBOX ?? env.CODESENTINEL_SANDBOX) as
+      | 'docker'
+      | 'host'
+      | 'auto'
+      | undefined) ??
+    'auto'
+  const analyzerTimeoutMs =
+    p.analyzerTimeoutMs ??
+    Number(
+      env.CodeSentinel_ANALYZER_TIMEOUT_MS ??
+        env.CODESENTINEL_ANALYZER_TIMEOUT_MS ??
+        '60000'
+    )
+  const astChecks =
+    p.astChecks ??
+    (env.CodeSentinel_AST_CHECKS !== undefined
+      ? env.CodeSentinel_AST_CHECKS !== 'false'
+      : env.CODESENTINEL_AST_CHECKS !== undefined
+        ? env.CODESENTINEL_AST_CHECKS !== 'false'
+        : true)
+  const hitlMode =
+    p.hitlMode ??
+    ((env.CodeSentinel_HITL_MODE ?? env.CODESENTINEL_HITL_MODE) as
+      | 'off'
+      | 'suggest'
+      | 'interactive'
+      | undefined) ??
+    'suggest'
+  const maxAttempts =
+    p.maxAttempts ??
+    Number(env.CodeSentinel_MAX_ATTEMPTS ?? env.CODESENTINEL_MAX_ATTEMPTS ?? '3')
+
   return {
     platform,
     workspace,
@@ -138,5 +194,51 @@ export const resolveReviewConfig = (
     headSha,
     github,
     mcpServers: parseMcpServers(p, env),
+    prUrl,
+    staticAnalysis,
+    sandbox,
+    analyzerTimeoutMs,
+    astChecks,
+    hitlMode,
+    maxAttempts,
+  }
+}
+
+/**
+ * Copies resolved review configuration into process.env before the flue agent
+ * session is initialized.
+ *
+ * Why this exists:
+ * In flue beta.9, agent initializers only receive `{ id, env }` (NodeJS process.env
+ * or worker env) with no per-invocation payload. The workflow receives the payload,
+ * resolves it into ReviewConfig, and must synchronize these values into process.env
+ * so that createAgent and tool initializers see the user's payload overrides.
+ */
+export const applyPayloadToEnv = (
+  cfg: ReviewConfig,
+  targetEnv: NodeJS.ProcessEnv = process.env
+): void => {
+  if (cfg.model) targetEnv.CodeSentinel_MODEL = cfg.model
+  if (cfg.thinkingLevel) targetEnv.CodeSentinel_THINKING_LEVEL = cfg.thinkingLevel
+  if (cfg.reviewLanguage) targetEnv.CodeSentinel_REVIEW_LANGUAGE = cfg.reviewLanguage
+  if (cfg.workspace) targetEnv.GITHUB_WORKSPACE = cfg.workspace
+  if (cfg.baseSha) targetEnv.BASE_SHA = cfg.baseSha
+  if (cfg.headSha) targetEnv.HEAD_SHA = cfg.headSha
+  if (cfg.customInstructions)
+    targetEnv.CodeSentinel_CUSTOM_INSTRUCTIONS = cfg.customInstructions
+  if (cfg.ignore && cfg.ignore.length > 0)
+    targetEnv.CodeSentinel_IGNORE = cfg.ignore.join(',')
+  targetEnv.CodeSentinel_TELEMETRY = String(cfg.telemetry)
+  targetEnv.CodeSentinel_STATIC_ANALYSIS = String(cfg.staticAnalysis)
+  targetEnv.CodeSentinel_SANDBOX = cfg.sandbox
+  targetEnv.CodeSentinel_ANALYZER_TIMEOUT_MS = String(cfg.analyzerTimeoutMs)
+  targetEnv.CodeSentinel_AST_CHECKS = String(cfg.astChecks)
+  targetEnv.CodeSentinel_HITL_MODE = cfg.hitlMode
+  targetEnv.CodeSentinel_MAX_ATTEMPTS = String(cfg.maxAttempts)
+  if (cfg.prUrl) targetEnv.CodeSentinel_PR_URL = cfg.prUrl
+  if (cfg.github) {
+    targetEnv.CodeSentinel_PR_NUMBER = String(cfg.github.prNumber)
+    targetEnv.GITHUB_REPOSITORY = `${cfg.github.owner}/${cfg.github.repo}`
+    if (cfg.github.token) targetEnv.GITHUB_TOKEN = cfg.github.token
   }
 }

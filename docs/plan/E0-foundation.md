@@ -58,7 +58,7 @@ export const onlyChanged = (all: Finding[], changed: Map<string, LineRange[]>): 
 - **Tests:** `tests/review/findings.test.ts` covers id stability, dedupe of a Bandit B602 and a Ruff S602 on the same line into a single finding, and `onlyChanged` boundaries (start, end, and pure deletions).
 - **Accept:** tests pass, and nothing else in the codebase changes.
 
-## E0.3 Workflow honors its payload
+## E0.3 Workflow honors its payload [x]
 **Files:** `src/workflows/review.ts`, `src/review/config.ts`, `tests/workflows/review.test.ts`
 
 1. Read the flue types (`node_modules/@flue/runtime`) to confirm what `run()` receives. The input is expected to arrive as `input` or `payload`.

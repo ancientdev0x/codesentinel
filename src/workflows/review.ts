@@ -3,10 +3,42 @@ import * as v from 'valibot'
 import reviewer from '../agents/reviewer'
 import { sendReviewStarted } from '../common/telemetry'
 import { createReporter } from '../github/reporter'
-import { resolveReviewConfig } from '../review/config'
+import {
+  applyPayloadToEnv,
+  type ReviewPayload,
+  resolveReviewConfig,
+} from '../review/config'
 import { buildReviewPrompt } from '../review/context'
 import { type ReviewFileWithDiff, getChangedFiles } from '../review/diff'
 import { filterFiles } from '../review/utils/filterFiles'
+
+/**
+ * Permissive top-level object schema for workflow run payload.
+ * Valibot's object() ignores unknown keys, so old callers keep working.
+ */
+export const ReviewWorkflowInputSchema = v.object({
+  platform: v.optional(v.picklist(['github', 'local'])),
+  workspace: v.optional(v.string()),
+  prUrl: v.optional(v.string()),
+  baseSha: v.optional(v.string()),
+  headSha: v.optional(v.string()),
+  model: v.optional(v.string()),
+  thinkingLevel: v.optional(v.picklist(['off', 'low', 'medium', 'high'])),
+  reviewLanguage: v.optional(v.string()),
+  ignore: v.optional(v.array(v.string())),
+  customInstructions: v.optional(v.string()),
+  telemetry: v.optional(v.boolean()),
+  owner: v.optional(v.string()),
+  repo: v.optional(v.string()),
+  prNumber: v.optional(v.number()),
+  mcpServers: v.optional(v.record(v.string(), v.any())),
+  staticAnalysis: v.optional(v.boolean()),
+  sandbox: v.optional(v.picklist(['docker', 'host', 'auto'])),
+  analyzerTimeoutMs: v.optional(v.number()),
+  astChecks: v.optional(v.boolean()),
+  hitlMode: v.optional(v.picklist(['off', 'suggest', 'interactive'])),
+  maxAttempts: v.optional(v.number()),
+})
 
 /**
  * One-shot code review, exposed as `POST /workflows/review` on the built server
@@ -15,9 +47,8 @@ import { filterFiles } from '../review/utils/filterFiles'
  * flue beta.9 shape: a workflow is `defineWorkflow({ agent, run })`. The run
  * handler computes the PR diff, drives the reviewer agent over the shared harness
  * (it posts inline comments via `suggest_change`), then posts the summary. Config
- * resolves from the environment (the reviewer agent resolves the same way), so the
- * agent and workflow stay in lockstep. The `input` schema exists only to accept the
- * CLI's `{platform, workspace}` POST body without a WorkflowInputUnexpectedError.
+ * resolves from the payload and environment (the reviewer agent resolves the same way),
+ * so the agent and workflow stay in lockstep.
  */
 
 /**
@@ -29,12 +60,14 @@ export const route: WorkflowRouteHandler = async (_c, next) => next()
 
 export default defineWorkflow({
   agent: reviewer,
-  // Permissive top-level object schema — accepts the CLI's {platform, workspace} POST
-  // body (valibot's object() ignores unknown keys) without a WorkflowInputUnexpectedError.
-  // defineWorkflow requires a top-level OBJECT schema here (not record/union).
-  input: v.object({}),
-  async run({ harness }): Promise<JsonValue> {
-    const cfg = resolveReviewConfig(undefined, process.env)
+  input: ReviewWorkflowInputSchema,
+  async run(ctx): Promise<JsonValue> {
+    const { harness } = ctx
+    const input = (ctx.input ?? (ctx as { payload?: ReviewPayload }).payload) as
+      | ReviewPayload
+      | undefined
+    const cfg = resolveReviewConfig(input, process.env)
+    applyPayloadToEnv(cfg, process.env)
 
     const { files } = await getChangedFiles(cfg)
     const filtered = filterFiles(files, cfg.ignore, cfg.workspace) as ReviewFileWithDiff[]

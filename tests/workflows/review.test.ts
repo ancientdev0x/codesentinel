@@ -27,8 +27,8 @@ const makeHarness = (text: unknown = 'SUMMARY') => {
   return { harness, session }
 }
 
-const runWorkflow = (harness: unknown) =>
-  reviewWorkflow.action.run({ harness, log: {}, input: {} } as never)
+const runWorkflow = (harness: unknown, input: unknown = {}) =>
+  reviewWorkflow.action.run({ harness, log: {}, input } as never)
 
 const makeFile = (fileName: string) => ({
   fileName,
@@ -134,5 +134,30 @@ describe('review workflow run()', () => {
       message: 'No changed files to review.',
     })
     expect(harness.session).not.toHaveBeenCalled()
+  })
+
+  it('honors input payload and passes it to getChangedFiles', async () => {
+    getChangedFiles.mockResolvedValue({
+      files: [makeFile('src/changed.ts')],
+      rawDiff: 'raw',
+    })
+    const { harness } = makeHarness()
+    const payload = {
+      platform: 'local' as const,
+      baseSha: 'HEAD~1',
+      headSha: 'HEAD',
+      model: 'openai/gpt-4.1-mini',
+    }
+
+    await runWorkflow(harness, payload)
+
+    expect(getChangedFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'local',
+        baseSha: 'HEAD~1',
+        headSha: 'HEAD',
+        model: 'openai/gpt-4.1-mini',
+      })
+    )
   })
 })
