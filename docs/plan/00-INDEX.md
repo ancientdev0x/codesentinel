@@ -79,13 +79,13 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [ ] E5.3 Local mode: CLI approve/reject/edit loop → `Command({ resume })` → `git apply`
   - [ ] E5.4 GitHub mode: patch comments with ids + `/codesentinel apply|reject <id>` handler
   - [ ] E5.5 Mention workflow update (needs CI-edit approval)
-- [ ] **E6 Langfuse observability** (C4b): [`E6-langfuse-observability.md`](E6-langfuse-observability.md) *(~1d, can start after E0)*
-  - [ ] E6.1 OTel + `LangfuseSpanProcessor` bootstrap, env-gated, flush on exit
-  - [ ] E6.2 Trace per review; span per graph node
-  - [ ] E6.3 `traced()` wrapper on every tool → per-tool latency + error level
-  - [ ] E6.4 Generation observations with token `usageDetails` from flue
-  - [ ] E6.5 Subprocess spans (bandit/ruff/docker) with duration, exit, timeout flag
-  - [ ] E6.6 Strictness: schema-validated metadata, CI test that fails if a tool is unwrapped
+- [x] **E6 Langfuse observability** (C4b): [`E6-langfuse-observability.md`](E6-langfuse-observability.md) *(~1d, can start after E0)*
+  - [x] E6.1 OTel + `LangfuseSpanProcessor` bootstrap, env-gated, flush on exit
+  - [x] E6.2 Trace per review; span per graph node
+  - [x] E6.3 `traced()` wrapper on every tool → per-tool latency + error level
+  - [x] E6.4 Generation observations with token `usageDetails` from flue
+  - [x] E6.5 Subprocess spans (bandit/ruff/docker) with duration, exit, timeout flag
+  - [x] E6.6 Strictness: schema-validated metadata, CI test that fails if a tool is unwrapped
 - [ ] **E7 Evaluation + metrics** (makes "identifying vulnerabilities" provable): [`E7-eval-and-metrics.md`](E7-eval-and-metrics.md) *(~1d, last)*
   - [ ] E7.1 Ground-truth labels for the seeded fixtures
   - [ ] E7.2 `npm run eval`: deterministic stage recall/precision (no LLM, runs in CI)
