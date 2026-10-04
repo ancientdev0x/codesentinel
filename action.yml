@@ -93,6 +93,9 @@ inputs:
   LANGFUSE_HOST:
     description: "Langfuse host URL (e.g. https://cloud.langfuse.com)"
     required: false
+  LANGFUSE_BASE_URL:
+    description: "Langfuse base URL (alias for LANGFUSE_HOST)"
+    required: false
   GITHUB_TOKEN:
     description: "GitHub token used to post review comments"
     required: true
@@ -161,7 +164,8 @@ runs:
         CodeSentinel_PR_URL: ${{ inputs.PR_URL }}
         LANGFUSE_PUBLIC_KEY: ${{ inputs.LANGFUSE_PUBLIC_KEY || env.LANGFUSE_PUBLIC_KEY }}
         LANGFUSE_SECRET_KEY: ${{ inputs.LANGFUSE_SECRET_KEY || env.LANGFUSE_SECRET_KEY }}
-        LANGFUSE_HOST: ${{ inputs.LANGFUSE_HOST || env.LANGFUSE_HOST }}
+        LANGFUSE_HOST: ${{ inputs.LANGFUSE_HOST || inputs.LANGFUSE_BASE_URL || env.LANGFUSE_HOST || env.LANGFUSE_BASE_URL }}
+        LANGFUSE_BASE_URL: ${{ inputs.LANGFUSE_BASE_URL || inputs.LANGFUSE_HOST || env.LANGFUSE_BASE_URL || env.LANGFUSE_HOST }}
       run: |
         npx flue run review \
           --root "$GITHUB_ACTION_PATH" \

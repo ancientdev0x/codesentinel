@@ -4,6 +4,7 @@ import reviewer from '../agents/reviewer'
 import type { AnalyzerReportRow } from '../common/formatting/summary'
 import { sendReviewStarted } from '../common/telemetry'
 import { createReporter } from '../github/reporter'
+import { flushTracing, initTracing } from '../observability/langfuse'
 import { runStaticAnalysis } from '../review/analyzers'
 import {
   applyPayloadToEnv,
@@ -68,6 +69,7 @@ export default defineWorkflow({
   agent: reviewer,
   input: ReviewWorkflowInputSchema,
   async run(ctx): Promise<JsonValue> {
+    initTracing(process.env)
     const { harness } = ctx
     const input = (ctx.input ?? (ctx as { payload?: ReviewPayload }).payload) as
       | ReviewPayload
@@ -172,6 +174,9 @@ export default defineWorkflow({
         summary,
       }
     } finally {
+      await flushTracing().catch((err) => {
+        console.warn('[CodeSentinel] Failed to flush Langfuse tracing:', err)
+      })
       if (cleanupPr) {
         await cleanupPr().catch((err) => {
           console.warn(
