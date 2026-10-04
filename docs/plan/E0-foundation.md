@@ -109,8 +109,32 @@ Also include 2–3 **clean** changed files to measure false positives. E7.1 writ
 
 - **Accept:** `makeRepo()` works in a test, and `git diff base...head` lists all of the files above.
 
-## E0.6 Approvals
+## E0.6 Approvals [x]
 Show the user the dependency table and the CI-edit list from `00-INDEX.md`, and record their approval in this file under `## Approvals`.
+
+## Approvals
+The repository owner has granted explicit approval for:
+- Dependencies: `@langchain/langgraph`, `@langchain/core`, `zod`, `@ast-grep/napi`, `@ast-grep/lang-python`, `@langfuse/tracing`, `@langfuse/otel`, `@opentelemetry/sdk-node`. (Python tools `bandit` and `ruff` go in the Docker image / pipx only, never package.json).
+- CI workflow files: `action.yml`, `.github/workflows/CodeSentinel-mention.yml`, `.github/workflows/pr.yml` for the planned changes.
+
+## Deviations
+1. **Flue CLI parameter**: In `@flue/cli`, workflow runs accept input via `--input <json>` rather than `--payload <json>`. `src/workflows/review.ts` was made to transparently accept both `ctx.input` and `ctx.payload`.
+2. **Global libvips / sharp npm install**: On systems with globally installed `vips-cpp` (e.g. Arch/Fedora), sharp defaults to compiling from source unless `SHARP_IGNORE_GLOBAL_LIBVIPS=1` is provided. Running install with `SHARP_IGNORE_GLOBAL_LIBVIPS=1` succeeded and verified `patch-package`.
+3. **Tool configuration cache**: Added `.commandcode/` to `.gitignore` and `.oxfmtrc.json` ignore list to keep formatting checks clean.
 
 ## Done when
 E0.1–E0.6 are ticked, and `npm run check && npm run check:types && npm test` is green.
+
+## Verification
+- **E0.1**: `git restore README.md AGENTS.md` executed. Both files are restored and tracked.
+- **E0.2**: `tests/review/findings.test.ts` (10 tests) passed. Verified ID stability, deduplication of Bandit B602 and Ruff S602 into single finding with highest severity, onlyChanged boundary conditions and pure deletion filtering, and valibot schema validation.
+- **E0.3**: `tests/workflows/review.test.ts` passed. Verified `ReviewWorkflowInputSchema` accepts permissive fields, `resolveReviewConfig` receives payload, `getChangedFiles` receives payload config, and `applyPayloadToEnv` synchronizes config into process.env.
+- **E0.4**: `tests/review/config.test.ts` (12 tests) passed. Verified precedence (payload > env > default) for all feature flags (`staticAnalysis`, `sandbox`, `analyzerTimeoutMs`, `astChecks`, `hitlMode`, `maxAttempts`, `prUrl`). `action.yml` inputs and env mappings added.
+- **E0.5**: `tests/helpers/makeRepo.test.ts` passed. Verified `makeRepo()` creates git repository, commits base clean files and head vulnerable edits, and `git diff base...head` contains all 13 seeded vulnerable and clean files.
+- **E0.6**: Approvals recorded above.
+- **Quality Gate**:
+  - `npm run check`: 0 warnings, 0 errors, all files formatted.
+  - `npm run check:types`: tsc --noEmit succeeded with 0 errors.
+  - `npm test`: 25 test files passed, 145 tests passed.
+  - `npm run build`: `dist/server.mjs` built successfully.
+  - Smoke test: server booted and listened on port 38271.
