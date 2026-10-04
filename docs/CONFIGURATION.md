@@ -67,6 +67,13 @@ code defaults, not documentation guesswork.
 | `CodeSentinel_CUSTOM_INSTRUCTIONS` | env | — | Extra instructions appended to the review prompt. |
 | `CodeSentinel_MCP_SERVERS` | env/payload | `{}` | JSON map of remote MCP servers (also `payload.mcpServers`). See [MCP](./mcp.md). |
 | `CodeSentinel_TELEMETRY` | env | `true` | `false` opts out of anonymous telemetry. |
+| `CodeSentinel_STATIC_ANALYSIS` | env/payload | `true` | Enable Bandit/Ruff and static analysis tools. Set `false` to disable. |
+| `CodeSentinel_SANDBOX` | env/payload | `auto` | Isolation mode: `docker \| host \| auto` (docker if available). |
+| `CodeSentinel_ANALYZER_TIMEOUT_MS` | env/payload | `60000` | Subprocess / container execution timeout in ms. |
+| `CodeSentinel_AST_CHECKS` | env/payload | `true` | Run strict AST-level checks on changed code fragments. |
+| `CodeSentinel_HITL_MODE` | env/payload | `suggest` | Human-in-the-loop review mode: `off \| suggest \| interactive`. |
+| `CodeSentinel_MAX_ATTEMPTS` | env/payload | `3` | Maximum self-correction / retry attempts in review graph. |
+| `CodeSentinel_PR_URL` | env/payload | — | Optional GitHub PR URL to ingest (`owner/repo/pull/N`). |
 | `CodeSentinel_PR_NUMBER` | env | `0` | PR number (GitHub platform only). |
 | `BASE_SHA` / `HEAD_SHA` | env | PR event SHAs / `GITHUB_SHA` | Diff range. Three-dot `base...head`. |
 | `platform` | payload | `github` in Actions, else `local` | `local` reviews the staged diff (`git diff --cached`). |

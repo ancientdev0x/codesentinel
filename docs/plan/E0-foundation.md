@@ -67,7 +67,7 @@ export const onlyChanged = (all: Finding[], changed: Map<string, LineRange[]>): 
 4. The agent initializer only gets `env` (see the comment in `src/agents/reviewer.ts`). Anything the agent needs from the payload must be copied into `process.env` **before** `harness.session()`. Write a small `applyPayloadToEnv(cfg)` helper and document why it exists.
 - **Accept:** `flue run review --payload '{"platform":"local","baseSha":"HEAD~1","headSha":"HEAD"}'` reviews the last commit instead of staged changes. A test asserts that `resolveReviewConfig` gets called with the payload.
 
-## E0.4 Feature flags
+## E0.4 Feature flags [x]
 **Files:** `src/review/config.ts`, `action.yml`, `docs/CONFIGURATION.md`
 
 Add to `ReviewPayload` and `ReviewConfig`. Precedence is payload, then env, then default.

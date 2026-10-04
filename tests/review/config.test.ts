@@ -96,4 +96,69 @@ describe('resolveReviewConfig', () => {
     )
     expect(cfg.mcpServers).toEqual({ p: { url: 'payload' } })
   })
+
+  describe('feature flags precedence', () => {
+    test('defaults when neither payload nor env is provided', () => {
+      const cfg = resolveReviewConfig(undefined, env({}))
+      expect(cfg.staticAnalysis).toBe(true)
+      expect(cfg.sandbox).toBe('auto')
+      expect(cfg.analyzerTimeoutMs).toBe(60000)
+      expect(cfg.astChecks).toBe(true)
+      expect(cfg.hitlMode).toBe('suggest')
+      expect(cfg.maxAttempts).toBe(3)
+      expect(cfg.prUrl).toBeUndefined()
+    })
+
+    test('env overrides defaults', () => {
+      const cfg = resolveReviewConfig(
+        undefined,
+        env({
+          CodeSentinel_STATIC_ANALYSIS: 'false',
+          CodeSentinel_SANDBOX: 'host',
+          CodeSentinel_ANALYZER_TIMEOUT_MS: '45000',
+          CodeSentinel_AST_CHECKS: 'false',
+          CodeSentinel_HITL_MODE: 'interactive',
+          CodeSentinel_MAX_ATTEMPTS: '5',
+          CodeSentinel_PR_URL: 'https://github.com/owner/repo/pull/123',
+        })
+      )
+      expect(cfg.staticAnalysis).toBe(false)
+      expect(cfg.sandbox).toBe('host')
+      expect(cfg.analyzerTimeoutMs).toBe(45000)
+      expect(cfg.astChecks).toBe(false)
+      expect(cfg.hitlMode).toBe('interactive')
+      expect(cfg.maxAttempts).toBe(5)
+      expect(cfg.prUrl).toBe('https://github.com/owner/repo/pull/123')
+    })
+
+    test('payload overrides env and defaults', () => {
+      const cfg = resolveReviewConfig(
+        {
+          staticAnalysis: true,
+          sandbox: 'docker',
+          analyzerTimeoutMs: 30000,
+          astChecks: true,
+          hitlMode: 'off',
+          maxAttempts: 2,
+          prUrl: 'https://github.com/owner/repo/pull/999',
+        },
+        env({
+          CodeSentinel_STATIC_ANALYSIS: 'false',
+          CodeSentinel_SANDBOX: 'host',
+          CodeSentinel_ANALYZER_TIMEOUT_MS: '45000',
+          CodeSentinel_AST_CHECKS: 'false',
+          CodeSentinel_HITL_MODE: 'interactive',
+          CodeSentinel_MAX_ATTEMPTS: '5',
+          CodeSentinel_PR_URL: 'https://github.com/owner/repo/pull/123',
+        })
+      )
+      expect(cfg.staticAnalysis).toBe(true)
+      expect(cfg.sandbox).toBe('docker')
+      expect(cfg.analyzerTimeoutMs).toBe(30000)
+      expect(cfg.astChecks).toBe(true)
+      expect(cfg.hitlMode).toBe('off')
+      expect(cfg.maxAttempts).toBe(2)
+      expect(cfg.prUrl).toBe('https://github.com/owner/repo/pull/999')
+    })
+  })
 })
