@@ -52,12 +52,12 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E1.2 `src/review/source.ts`: fetch PR meta, shallow-fetch head/base into a temp worktree
   - [x] E1.3 CLI `CodeSentinel review --pr <url>` and payload `prUrl`
   - [x] E1.4 Make the reporter target the URL's PR (post comments there when a token is available)
-- [ ] **E2 AST fragment extraction + AST checks** (C1): [`E2-ast-extraction.md`](E2-ast-extraction.md) *(~1.5d)*
-  - [ ] E2.1 `@ast-grep/napi` + Python language registration; `src/review/ast/parse.ts`
-  - [ ] E2.2 `extractFragments()`: changed lines → enclosing function/class/method nodes
-  - [ ] E2.3 Rule packs `src/review/ast/rules/{python,typescript}.yml` (sinks: eval/exec/shell/pickle/SQL concat/…)
-  - [ ] E2.4 `runAstChecks()` → `Finding[]` restricted to changed lines
-  - [ ] E2.5 Feed fragments (not raw `-U0` hunks) into the prompt
+- [x] **E2 AST fragment extraction + AST checks** (C1): [`E2-ast-extraction.md`](E2-ast-extraction.md) *(~1.5d)*
+  - [x] E2.1 `@ast-grep/napi` + Python language registration; `src/review/ast/parse.ts`
+  - [x] E2.2 `extractFragments()`: changed lines → enclosing function/class/method nodes
+  - [x] E2.3 Rule packs `src/review/ast/rules/{python,typescript}.yml` (sinks: eval/exec/shell/pickle/SQL concat/…)
+  - [x] E2.4 `runAstChecks()` → `Finding[]` restricted to changed lines
+  - [x] E2.5 Feed fragments (not raw `-U0` hunks) into the prompt
 - [ ] **E3 Sandboxed static analysis: Bandit + Ruff** (C2): [`E3-static-analysis-sandbox.md`](E3-static-analysis-sandbox.md) *(~2d)*
   - [ ] E3.1 `src/sandbox/run.ts`: `runIsolated()` with execFile, timeout, SIGKILL, maxBuffer, typed result
   - [ ] E3.2 Docker backend (`--network none --read-only --cap-drop ALL …`) + `docker/analyzers.Dockerfile`

@@ -16,7 +16,7 @@ Library choice: **`@ast-grep/napi`** covers both parsing and rule matching, so w
 
 ---
 
-## E2.1 Parser wrapper
+## E2.1 Parser wrapper [x]
 **File:** `src/review/ast/parse.ts`
 ```ts
 import { parse, Lang, registerDynamicLanguage } from '@ast-grep/napi'
@@ -32,7 +32,7 @@ export const parseFile = (lang: AstLang, source: string) => { ensureLangs(); ret
 - Files that fail to parse return `undefined` and log a warning. A parse failure must never fail the review.
 - **Accept:** a unit test parses one fixture per language and checks the root node kind.
 
-## E2.2 Fragment extraction
+## E2.2 Fragment extraction [x]
 **File:** `src/review/ast/fragments.ts`
 ```ts
 export interface CodeFragment {
@@ -61,7 +61,7 @@ Algorithm:
   - A huge function gets truncated.
 - **Accept:** tests pass on the E0.5 fixtures.
 
-## E2.3 Rule packs
+## E2.3 Rule packs [x]
 **Files:** `src/review/ast/rules/python.yml`, `src/review/ast/rules/typescript.yml`, `src/review/ast/rules/index.ts`
 
 Use ast-grep YAML rules. Each rule has `id`, `language`, `severity`, `message`, `rule`, plus a `metadata: { cwe }`. Minimum set:
@@ -84,7 +84,7 @@ Use ast-grep YAML rules. Each rule has `id`, `language`, `severity`, `message`, 
 - Load the rules with `findAll` per rule using the napi config object (or `ast-grep scan --json` if napi lacks YAML loading). Pick whichever the current docs support; that is a Deviation to record.
 - **Accept:** each rule has one positive and one negative test snippet in `tests/review/ast/rules.test.ts`.
 
-## E2.4 `runAstChecks`
+## E2.4 `runAstChecks` [x]
 **File:** `src/review/ast/checks.ts`
 ```ts
 export const runAstChecks = (files: ReviewFileWithDiff[]): Finding[]
@@ -94,7 +94,7 @@ export const runAstChecks = (files: ReviewFileWithDiff[]): Finding[]
 - Wrap it in a per-file time budget of 2s. ast-grep is in-process and fast, but this guards against pathological files.
 - **Accept:** on the E0.5 fixtures it finds `py-subprocess-shell`, `py-sql-concat`, `py-eval-exec`, `ts-child-exec-template` and `ts-eval`, with zero findings in the clean files.
 
-## E2.5 Prompt uses fragments
+## E2.5 Prompt uses fragments [x]
 **File:** `src/review/context.ts`
 - Change `buildReviewPrompt(files, workspace)` to `buildReviewPrompt({files, fragments, findings}, workspace)`.
 - Per file, emit each fragment as `### path › symbol (L12–L48, changed: 20–24)` followed by a fenced code block. Add the raw hunk only for pure deletions.
@@ -110,3 +110,20 @@ export const runAstChecks = (files: ReviewFileWithDiff[]): Finding[]
 
 ## Done when
 E2.1–E2.5 are ticked and `npm test` is green. Also run `flue run review` on the fixture repo and confirm the prompt it logs contains fragments.
+
+## Deviations
+1. **In-process ast-grep rule execution without runtime YAML dependency:** `@ast-grep/napi`'s Napi API exposes `root.findAll({ rule: NapiConfig['rule'] })` directly for parsed AST queries but does not bundle a YAML parser at runtime. Adding an external YAML parser (`js-yaml`) is not permitted by user-approved dependencies. The canonical rules were authored in standard ast-grep YAML files (`src/review/ast/rules/python.yml`, `src/review/ast/rules/typescript.yml`) for CLI tooling compatibility, and mirrored as typed `NapiConfig` definitions in `src/review/ast/rules/index.ts` for fast, zero-dependency in-process execution.
+2. **Relational Search `stopBy: "end"`:** ast-grep napi's `has` relational matcher searches immediate children by default unless `stopBy: "end"` is specified. Configured `stopBy: "end"` on relational rules (e.g., keyword arguments `shell=True` and string interpolations inside function calls).
+3. **Flue Bundling Native External:** Verified that `@ast-grep/napi` and `@ast-grep/lang-python` are natively externalized by flue's esbuild bundler into `dist/server.mjs` without requiring manual esbuild config overrides.
+
+## Verification
+
+### Automated tests
+- `tests/review/ast/parse.test.ts`: 11/11 tests pass verifying parser wrapper, language detection (`.py`, `.ts`, `.tsx`, `.js`, `.mjs`, `.cjs`), line conversions (0-based to 1-based), and graceful degradation to `undefined` without throwing on syntax errors.
+- `tests/review/ast/fragments.test.ts`: 9/9 tests pass verifying method extraction (`Class.method`), deduplication of multiple edits inside the same function into a single fragment, top-level statements, 300-line code truncation with `…truncated`, pure deletions, and extraction against `tests/fixtures/vuln-repo`.
+- `tests/review/ast/rules.test.ts`: 14/14 tests pass with dedicated positive and negative test cases for all 12 security rules across Python and TypeScript.
+- `tests/review/ast/checks.test.ts`: 4/4 tests pass verifying `runAstChecks` against `tests/fixtures/vuln-repo` detecting `py-subprocess-shell`, `py-sql-concat`, `py-eval-exec`, `ts-child-exec-template`, `ts-eval`, producing 0 findings on clean files, enforcing the 2s per-file timeout guard, and restricting findings to `onlyChanged` lines.
+- `tests/review/context.test.ts`: 8/8 tests pass (including Vitest snapshot) verifying `buildReviewPrompt` formatting AST fragments for `.py` and `.ts`, falling back to diff hunks for `.md` and when `astChecks: false`, and rendering `## Pre-detected findings (verify each)` sorted by severity and capped at 50.
+- All 200 tests passing in the full test suite.
+- Quality gates pass: `npm run check && npm run check:types && npm test && npm run build` (built `dist/server.mjs` with 0 warnings/errors).
+
