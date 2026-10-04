@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Docker sandbox (E3.2) > buildDockerArgs contains every required security isolation flag 1`] = `
+[
+  "run",
+  "--rm",
+  "--name",
+  "cs-bandit-fixedname",
+  "--network",
+  "none",
+  "--read-only",
+  "--tmpfs",
+  "/tmp:rw,size=64m",
+  "--cap-drop",
+  "ALL",
+  "--security-opt",
+  "no-new-privileges",
+  "--pids-limit",
+  "128",
+  "--memory",
+  "512m",
+  "--cpus",
+  "1",
+  "--user",
+  "10001",
+  "-v",
+  "/workspace/test-repo:/src:ro",
+  "-w",
+  "/src",
+  "codesentinel-analyzers:0.1.0",
+  "bandit",
+  "-f",
+  "json",
+  "-r",
+  "app/",
+]
+`;
