@@ -74,13 +74,18 @@ describe('resolveReviewConfig', () => {
   test('MCP servers from env: { mcpServers } wrapper', () => {
     const cfg = resolveReviewConfig(
       undefined,
-      env({ CodeSentinel_MCP_SERVERS: JSON.stringify({ mcpServers: { a: { url: 'u' } } }) })
+      env({
+        CodeSentinel_MCP_SERVERS: JSON.stringify({ mcpServers: { a: { url: 'u' } } }),
+      })
     )
     expect(cfg.mcpServers).toEqual({ a: { url: 'u' } })
   })
 
   test('invalid MCP JSON falls back to empty', () => {
-    const cfg = resolveReviewConfig(undefined, env({ CodeSentinel_MCP_SERVERS: 'not json' }))
+    const cfg = resolveReviewConfig(
+      undefined,
+      env({ CodeSentinel_MCP_SERVERS: 'not json' })
+    )
     expect(cfg.mcpServers).toEqual({})
   })
 

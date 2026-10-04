@@ -94,5 +94,7 @@ For a Cloudflare AI Gateway in front of these models, use the
 ## Custom OpenAI-compatible providers
 
 To use a self-hosted or third-party OpenAI-compatible endpoint (for example Ollama or
-an internal gateway), register it with `registerProvider()` in `src/app.ts`. Once
-registered, reference it like any other provider via its `provider/model` string.
+an internal gateway), register it with flue's `registerProvider()` in a flue app entry.
+CodeSentinel itself ships no custom-provider entry (the built-in `anthropic`/`openai`/`openrouter`/
+`cloudflare-*` provider strings cover the standard cases), so this is only needed for
+private/self-hosted endpoints.

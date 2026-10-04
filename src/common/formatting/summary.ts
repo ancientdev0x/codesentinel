@@ -4,7 +4,8 @@
 export const FORMATTING = {
   SUMMARY_TITLE: '## General Summary 🏴‍☠️',
   SEPARATOR: '\n\n---\n\n',
-  SIGN_OFF: '### Review powered by [CodeSentinel 🚢](https://github.com/ancientdev0x/CodeSentinel)',
+  SIGN_OFF:
+    '### Review powered by [CodeSentinel 🚢](https://github.com/ancientdev0x/CodeSentinel)',
   CTA: `<details>
 <summary>🚀 Good review?</summary>
 

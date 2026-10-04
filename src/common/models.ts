@@ -29,7 +29,8 @@ export const resolveModel = (env: Env, override?: string): string =>
 
 /** Model for the QA lead + healer — the judgment tier. Inherits `CodeSentinel_MODEL`. */
 export const resolveQaLeadModel = (env: Env, override?: string): string =>
-  firstSet(override, env.CodeSentinel_QA_MODEL, env.CodeSentinel_MODEL) ?? DEFAULT_QA_LEAD_MODEL
+  firstSet(override, env.CodeSentinel_QA_MODEL, env.CodeSentinel_MODEL) ??
+  DEFAULT_QA_LEAD_MODEL
 
 /**
  * Model for the QA per-flow drivers — the cheap "hands" tier. Inherits the QA lead

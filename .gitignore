@@ -36,3 +36,6 @@ cdk.context.json
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Tool cache
+.commandcode/

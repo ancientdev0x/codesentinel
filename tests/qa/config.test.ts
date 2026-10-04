@@ -19,11 +19,13 @@ describe('resolveQaConfig', () => {
     expect(resolveQaConfig({ kind: 'cli' }, env({})).kind).toBe('cli')
     expect(resolveQaConfig({}, env({ CodeSentinel_QA_KIND: 'cli' })).kind).toBe('cli')
     // payload wins over env
-    expect(resolveQaConfig({ kind: 'web' }, env({ CodeSentinel_QA_KIND: 'cli' })).kind).toBe(
+    expect(
+      resolveQaConfig({ kind: 'web' }, env({ CodeSentinel_QA_KIND: 'cli' })).kind
+    ).toBe('web')
+    // any non-'cli' env value falls back to web
+    expect(resolveQaConfig({}, env({ CodeSentinel_QA_KIND: 'nonsense' })).kind).toBe(
       'web'
     )
-    // any non-'cli' env value falls back to web
-    expect(resolveQaConfig({}, env({ CodeSentinel_QA_KIND: 'nonsense' })).kind).toBe('web')
   })
 
   it('payload overrides env', () => {

@@ -96,7 +96,9 @@ export const resolveReviewConfig = (
   const workspace = p.workspace ?? env.GITHUB_WORKSPACE ?? process.cwd()
   const model = resolveModel(env, p.model)
   const thinkingLevel =
-    p.thinkingLevel ?? (env.CodeSentinel_THINKING_LEVEL as ThinkingLevel) ?? DEFAULT_THINKING
+    p.thinkingLevel ??
+    (env.CodeSentinel_THINKING_LEVEL as ThinkingLevel) ??
+    DEFAULT_THINKING
   const reviewLanguage = p.reviewLanguage ?? env.CodeSentinel_REVIEW_LANGUAGE ?? 'English'
   const baseSha = p.baseSha ?? env.BASE_SHA
   const headSha = p.headSha ?? env.HEAD_SHA ?? env.GITHUB_SHA

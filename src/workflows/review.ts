@@ -62,7 +62,8 @@ export default defineWorkflow({
     // message keeps the workflow model-agnostic.
     const response = await session.prompt(prompt)
     const summary =
-      response.text?.trim() || 'CodeSentinel completed the review; see the inline comments.'
+      response.text?.trim() ||
+      'CodeSentinel completed the review; see the inline comments.'
 
     const reporter = createReporter(cfg)
     const summaryUrl = await reporter.postSummary(summary)
