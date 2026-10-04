@@ -15,7 +15,7 @@
 - Confirm with the user that the deletion was unintentional. If so, run `git restore README.md AGENTS.md`.
 - **Accept:** both files exist and `git status` no longer lists them as deleted.
 
-## E0.2 Shared `Finding` model
+## E0.2 Shared `Finding` model [x]
 **File:** `src/review/findings.ts` (new)
 
 ```ts
