@@ -56,6 +56,9 @@
     "@ast-grep/napi": "^0.45.3",
     "@flue/github": "1.0.0-beta.1",
     "@flue/runtime": "1.0.0-beta.9",
+    "@langfuse/otel": "^5.11.1",
+    "@langfuse/tracing": "^5.11.1",
+    "@opentelemetry/sdk-node": "^0.222.0",
     "octokit": "^3.1.0",
     "picomatch": "^4.0.2",
     "valibot": "^1.4.1"
