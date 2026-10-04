@@ -1,4 +1,5 @@
 import { type AgentProfile, defineAgentProfile } from '@flue/runtime'
+import { traceTools } from '../observability/tools'
 import { createRunSpecTool } from '../tools/run-spec'
 import type { QaConfig } from './config'
 import { buildHealerInstructions } from './instructions'
@@ -44,5 +45,5 @@ export const healerProfile = (cfg: QaConfig): AgentProfile =>
     model: cfg.model,
     thinkingLevel: 'high',
     instructions: buildHealerInstructions(cfg),
-    tools: [createRunSpecTool(cfg)],
+    tools: traceTools([createRunSpecTool(cfg)]),
   })

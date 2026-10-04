@@ -5,6 +5,7 @@ import { resolveQaConfig } from '../qa/config'
 import { driverProfile } from '../qa/driver'
 import { healerProfile } from '../qa/healer'
 import { buildQaInstructions } from '../qa/instructions'
+import { traceTools } from '../observability/tools'
 import { createCatalogFlowsTool } from '../tools/catalog-flows'
 import { createClassifyFindingTool } from '../tools/classify-finding'
 import { createOpenPrTool } from '../tools/open-pull-request'
@@ -44,13 +45,13 @@ export default createAgent(async ({ env }) => {
     }),
     cwd: cfg.workspace, // .agents/skills/chrome-cdp is materialized here at run start
     instructions: await buildQaInstructions(cfg),
-    tools: [
+    tools: traceTools([
       createCatalogFlowsTool(cfg),
       createRunSpecTool(cfg),
       createClassifyFindingTool(cfg),
       createOpenPrTool(cfg),
       ...mcp.tools,
-    ],
+    ]),
     // The subagents the lead fans out to via `task` — depth-1 siblings. `driverProfile`
     // resolves cfg.kind to the ONE matching driver: browser-driver for kind 'web' (its
     // own headless Chrome, writes + verifies a .cdp.mjs spec) or cli-driver for kind
