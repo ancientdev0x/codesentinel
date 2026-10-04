@@ -1,0 +1,100 @@
+rules:
+  - id: py-eval-exec
+    language: python
+    severity: high
+    message: Use of eval/exec with dynamic arguments enables arbitrary code execution.
+    metadata:
+      cwe: CWE-95
+    rule:
+      any:
+        - all:
+            - pattern: eval($X)
+            - not:
+                has:
+                  kind: string
+                  stopBy: end
+        - all:
+            - pattern: exec($X)
+            - not:
+                has:
+                  kind: string
+                  stopBy: end
+
+  - id: py-subprocess-shell
+    language: python
+    severity: high
+    message: Subprocess invoked with shell=True is vulnerable to shell injection.
+    metadata:
+      cwe: CWE-78
+    rule:
+      all:
+        - pattern: subprocess.$F($$$ARGS)
+        - has:
+            kind: keyword_argument
+            regex: ^shell\s*=\s*True
+            stopBy: end
+
+  - id: py-os-system
+    language: python
+    severity: high
+    message: os.system executes shell commands without argument sanitization.
+    metadata:
+      cwe: CWE-78
+    rule:
+      pattern: os.system($X)
+
+  - id: py-sql-concat
+    language: python
+    severity: high
+    message: SQL query constructed via string concatenation, % formatting, or f-string. Use parameterized queries.
+    metadata:
+      cwe: CWE-89
+    rule:
+      all:
+        - pattern: $C.execute($$$ARGS)
+        - has:
+            any:
+              - kind: binary_operator
+                regex: \+
+              - kind: binary_operator
+                regex: '%'
+              - kind: interpolation
+            stopBy: end
+
+  - id: py-pickle-loads
+    language: python
+    severity: high
+    message: Unpickling untrusted data with pickle.loads can execute arbitrary code.
+    metadata:
+      cwe: CWE-502
+    rule:
+      pattern: pickle.loads($X)
+
+  - id: py-yaml-unsafe
+    language: python
+    severity: high
+    message: yaml.load without explicit Loader=SafeLoader can execute arbitrary code.
+    metadata:
+      cwe: CWE-502
+    rule:
+      all:
+        - pattern: yaml.load($$$ARGS)
+        - not:
+            has:
+              kind: keyword_argument
+              regex: Loader
+              stopBy: end
+
+  - id: py-requests-noverify
+    language: python
+    severity: medium
+    message: TLS certificate verification is disabled (verify=False) in requests call.
+    metadata:
+      cwe: CWE-295
+    rule:
+      all:
+        - pattern: requests.$M($$$ARGS)
+        - has:
+            kind: keyword_argument
+            regex: ^verify\s*=\s*False
+            stopBy: end
