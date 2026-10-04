@@ -15,6 +15,22 @@ vi.mock('../../src/github/reporter', () => ({
   createReporter: (...args: unknown[]) => createReporter(...args),
 }))
 
+const cleanupPr = vi.fn().mockResolvedValue(undefined)
+const materializePr = vi.fn().mockResolvedValue({
+  workspace: '/tmp/pr-worktree',
+  baseSha: 'base-sha-123',
+  headSha: 'head-sha-456',
+  ref: { host: 'github.com', owner: 'owner', repo: 'repo', number: 42 },
+  cleanup: cleanupPr,
+})
+vi.mock('../../src/review/source', async (orig) => {
+  const actual = await orig<typeof import('../../src/review/source')>()
+  return {
+    ...actual,
+    materializePr: (...args: unknown[]) => materializePr(...args),
+  }
+})
+
 import reviewWorkflow from '../../src/workflows/review'
 
 // flue beta.9: the workflow is defineWorkflow({ agent, run }). Its run handler lives
@@ -159,5 +175,72 @@ describe('review workflow run()', () => {
         model: 'openai/gpt-4.1-mini',
       })
     )
+  })
+
+  it('materializes PR from prUrl, overrides config, and runs cleanup in finally', async () => {
+    vi.stubEnv('GITHUB_TOKEN', 'test-tok')
+    getChangedFiles.mockResolvedValue({
+      files: [makeFile('src/pr-change.ts')],
+      rawDiff: 'raw',
+    })
+    const { harness } = makeHarness()
+    const payload = {
+      prUrl: 'https://github.com/owner/repo/pull/42',
+    }
+
+    const result = (await runWorkflow(harness, payload)) as { reviewed: number }
+
+    expect(materializePr).toHaveBeenCalledWith(
+      { host: 'github.com', owner: 'owner', repo: 'repo', number: 42 },
+      'test-tok'
+    )
+    expect(getChangedFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: '/tmp/pr-worktree',
+        baseSha: 'base-sha-123',
+        headSha: 'head-sha-456',
+        github: {
+          owner: 'owner',
+          repo: 'repo',
+          prNumber: 42,
+          token: 'test-tok',
+        },
+        platform: 'github',
+      })
+    )
+    expect(cleanupPr).toHaveBeenCalledTimes(1)
+    expect(result.reviewed).toBe(1)
+  })
+
+  it('cleans up materialized PR worktree even when session prompt throws', async () => {
+    getChangedFiles.mockResolvedValue({
+      files: [makeFile('src/pr-change.ts')],
+      rawDiff: 'raw',
+    })
+    const session = { prompt: vi.fn().mockRejectedValue(new Error('crash')) }
+    const harness = { session: vi.fn().mockResolvedValue(session) }
+    const payload = {
+      prUrl: 'owner/repo#42',
+    }
+
+    await expect(runWorkflow(harness, payload)).rejects.toThrow('crash')
+    expect(cleanupPr).toHaveBeenCalledTimes(1)
+  })
+
+  it('caps review at 300 files when more than 300 files changed', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const files = Array.from({ length: 305 }, (_, i) => makeFile(`src/file_${i}.ts`))
+    getChangedFiles.mockResolvedValue({ files, rawDiff: 'raw' })
+    const { harness } = makeHarness()
+
+    const result = (await runWorkflow(harness, { platform: 'local' })) as {
+      reviewed: number
+    }
+
+    expect(result.reviewed).toBe(300)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('capping review at 300 files')
+    )
+    warnSpy.mockRestore()
   })
 })

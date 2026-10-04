@@ -106,7 +106,10 @@ export const resolveReviewConfig = (
 ): ReviewConfig => {
   const p = payload ?? {}
 
-  const platform: ReviewPlatform = p.platform ?? (env.GITHUB_ACTIONS ? 'github' : 'local')
+  const platform: ReviewPlatform =
+    p.platform ??
+    ((env.CodeSentinel_PLATFORM ?? env.CODESENTINEL_PLATFORM) as ReviewPlatform) ??
+    (env.GITHUB_ACTIONS ? 'github' : 'local')
   const workspace = p.workspace ?? env.GITHUB_WORKSPACE ?? process.cwd()
   const model = resolveModel(env, p.model)
   const thinkingLevel =
@@ -218,6 +221,7 @@ export const applyPayloadToEnv = (
   cfg: ReviewConfig,
   targetEnv: NodeJS.ProcessEnv = process.env
 ): void => {
+  if (cfg.platform) targetEnv.CodeSentinel_PLATFORM = cfg.platform
   if (cfg.model) targetEnv.CodeSentinel_MODEL = cfg.model
   if (cfg.thinkingLevel) targetEnv.CodeSentinel_THINKING_LEVEL = cfg.thinkingLevel
   if (cfg.reviewLanguage) targetEnv.CodeSentinel_REVIEW_LANGUAGE = cfg.reviewLanguage

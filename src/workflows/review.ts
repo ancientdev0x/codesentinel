@@ -10,6 +10,7 @@ import {
 } from '../review/config'
 import { buildReviewPrompt } from '../review/context'
 import { type ReviewFileWithDiff, getChangedFiles } from '../review/diff'
+import { materializePr, parsePrUrl } from '../review/source'
 import { filterFiles } from '../review/utils/filterFiles'
 
 /**
@@ -67,45 +68,87 @@ export default defineWorkflow({
       | ReviewPayload
       | undefined
     const cfg = resolveReviewConfig(input, process.env)
-    applyPayloadToEnv(cfg, process.env)
 
-    const { files } = await getChangedFiles(cfg)
-    const filtered = filterFiles(files, cfg.ignore, cfg.workspace) as ReviewFileWithDiff[]
+    let cleanupPr: (() => Promise<void>) | undefined
+    try {
+      if (cfg.prUrl) {
+        const prRef = parsePrUrl(cfg.prUrl)
+        const token = process.env.GITHUB_TOKEN
+        const materialized = await materializePr(prRef, token)
+        cleanupPr = materialized.cleanup
+        cfg.workspace = materialized.workspace
+        cfg.baseSha = materialized.baseSha
+        cfg.headSha = materialized.headSha
+        if (token && input?.platform !== 'local') {
+          cfg.github = {
+            owner: prRef.owner,
+            repo: prRef.repo,
+            prNumber: prRef.number,
+            token,
+          }
+          cfg.platform = 'github'
+        }
+      }
+      applyPayloadToEnv(cfg, process.env)
 
-    if (filtered.length === 0) {
-      return { reviewed: 0, summaryPosted: false, message: 'No changed files to review.' }
-    }
+      const { files } = await getChangedFiles(cfg)
+      let filtered = filterFiles(files, cfg.ignore, cfg.workspace) as ReviewFileWithDiff[]
 
-    sendReviewStarted(
-      {
-        enabled: cfg.telemetry,
-        repoSeed: cfg.github ? `${cfg.github.owner}/${cfg.github.repo}` : cfg.workspace,
-        platform: cfg.platform,
-        model: cfg.model,
-      },
-      filtered.length
-    )
+      if (filtered.length > 300) {
+        console.warn(
+          `[CodeSentinel] PR contains ${filtered.length} changed files; capping review at 300 files.`
+        )
+        filtered = filtered.slice(0, 300)
+      }
 
-    const session = await harness.session()
+      if (filtered.length === 0) {
+        return {
+          reviewed: 0,
+          summaryPosted: false,
+          message: 'No changed files to review.',
+        }
+      }
 
-    const prompt = buildReviewPrompt(filtered, cfg.workspace)
-    // Use the agent's final message as the summary rather than a structured
-    // `result` schema: response_format/json_schema is not supported by every
-    // provider (e.g. Cloudflare Workers AI returns 400), and a free-text final
-    // message keeps the workflow model-agnostic.
-    const response = await session.prompt(prompt)
-    const summary =
-      response.text?.trim() ||
-      'CodeSentinel completed the review; see the inline comments.'
+      sendReviewStarted(
+        {
+          enabled: cfg.telemetry,
+          repoSeed: cfg.github ? `${cfg.github.owner}/${cfg.github.repo}` : cfg.workspace,
+          platform: cfg.platform,
+          model: cfg.model,
+        },
+        filtered.length
+      )
 
-    const reporter = createReporter(cfg)
-    const summaryUrl = await reporter.postSummary(summary)
+      const session = await harness.session()
 
-    return {
-      reviewed: filtered.length,
-      summaryPosted: Boolean(summaryUrl),
-      summaryUrl: summaryUrl ?? null,
-      summary,
+      const prompt = buildReviewPrompt(filtered, cfg.workspace)
+      // Use the agent's final message as the summary rather than a structured
+      // `result` schema: response_format/json_schema is not supported by every
+      // provider (e.g. Cloudflare Workers AI returns 400), and a free-text final
+      // message keeps the workflow model-agnostic.
+      const response = await session.prompt(prompt)
+      const summary =
+        response.text?.trim() ||
+        'CodeSentinel completed the review; see the inline comments.'
+
+      const reporter = createReporter(cfg)
+      const summaryUrl = await reporter.postSummary(summary)
+
+      return {
+        reviewed: filtered.length,
+        summaryPosted: Boolean(summaryUrl),
+        summaryUrl: summaryUrl ?? null,
+        summary,
+      }
+    } finally {
+      if (cleanupPr) {
+        await cleanupPr().catch((err) => {
+          console.warn(
+            '[CodeSentinel] Failed to clean up materialized PR directory:',
+            err
+          )
+        })
+      }
     }
   },
 })

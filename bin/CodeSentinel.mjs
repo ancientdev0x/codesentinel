@@ -32,7 +32,7 @@ const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const HELP = `CodeSentinel — an extensible code review + QA agent (built on flue)
 
 Usage:
-  CodeSentinel review     Review the current repo (local = staged diff; CI = the PR)
+  CodeSentinel review [--pr <url>] Review the current repo (local = staged diff; CI = the PR; or any PR via --pr)
   CodeSentinel qa         Autonomous QA: explore, drive flows in headless Chrome, write+verify e2e tests
   CodeSentinel init       Scaffold a GitHub Actions workflow that reviews every pull request
   CodeSentinel qa init    Scaffold a weekly + on-demand QA workflow (+ e2e/.gitignore)
@@ -229,8 +229,32 @@ if (!existsSync(serverPath)) {
 
 const port = 1024 + Math.floor(Math.random() * 60000)
 const base = `http://127.0.0.1:${port}`
-const platform = process.env.GITHUB_ACTIONS ? 'github' : 'local'
-const payload = JSON.stringify({ platform, workspace: process.cwd() })
+let prUrl
+for (let i = 2; i < process.argv.length; i++) {
+  const arg = process.argv[i]
+  if (arg === '--pr') {
+    if (i + 1 < process.argv.length) {
+      prUrl = process.argv[++i]
+    } else {
+      process.stderr.write('CodeSentinel: --pr requires a PR URL or owner/repo#number\n')
+      process.exit(1)
+    }
+  } else if (arg.startsWith('--pr=')) {
+    prUrl = arg.slice(5)
+    if (!prUrl) {
+      process.stderr.write('CodeSentinel: --pr requires a PR URL or owner/repo#number\n')
+      process.exit(1)
+    }
+  }
+}
+
+const platform =
+  process.env.GITHUB_ACTIONS || (prUrl && process.env.GITHUB_TOKEN) ? 'github' : 'local'
+const payloadObj = { platform, workspace: process.cwd() }
+if (prUrl) {
+  payloadObj.prUrl = prUrl
+}
+const payload = JSON.stringify(payloadObj)
 
 const server = spawn(process.execPath, [serverPath], {
   env: { ...process.env, PORT: String(port) },
