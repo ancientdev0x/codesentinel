@@ -1,0 +1,170 @@
+[
+  {
+    "cell": null,
+    "code": "S307",
+    "end_location": {
+      "column": 22,
+      "row": 2
+    },
+    "filename": "/src/app/calc.py",
+    "fix": null,
+    "location": {
+      "column": 12,
+      "row": 2
+    },
+    "message": "Use of possibly insecure function; consider using `ast.literal_eval`",
+    "name": "suspicious-eval-usage",
+    "noqa_row": 2,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/suspicious-eval-usage"
+  },
+  {
+    "cell": null,
+    "code": "F401",
+    "end_location": {
+      "column": 10,
+      "row": 1
+    },
+    "filename": "/src/app/config.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 1,
+            "row": 2
+          },
+          "location": {
+            "column": 1,
+            "row": 1
+          }
+        }
+      ],
+      "message": "Remove unused import: `os`"
+    },
+    "location": {
+      "column": 8,
+      "row": 1
+    },
+    "message": "`os` imported but unused",
+    "name": "unused-import",
+    "noqa_row": 1,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": null,
+    "code": "S105",
+    "end_location": {
+      "column": 21,
+      "row": 3
+    },
+    "filename": "/src/app/config.py",
+    "fix": null,
+    "location": {
+      "column": 12,
+      "row": 3
+    },
+    "message": "Possible hardcoded password assigned to: \"password\"",
+    "name": "hardcoded-password-string",
+    "noqa_row": 3,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/hardcoded-password-string"
+  },
+  {
+    "cell": null,
+    "code": "S608",
+    "end_location": {
+      "column": 53,
+      "row": 2
+    },
+    "filename": "/src/app/db.py",
+    "fix": null,
+    "location": {
+      "column": 20,
+      "row": 2
+    },
+    "message": "Possible SQL injection vector through string-based query construction",
+    "name": "hardcoded-sql-expression",
+    "noqa_row": 2,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/hardcoded-sql-expression"
+  },
+  {
+    "cell": null,
+    "code": "F821",
+    "end_location": {
+      "column": 39,
+      "row": 2
+    },
+    "filename": "/src/app/regress.py",
+    "fix": null,
+    "location": {
+      "column": 16,
+      "row": 2
+    },
+    "message": "Undefined name `undefined_variable_name`",
+    "name": "undefined-name",
+    "noqa_row": 2,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
+  },
+  {
+    "cell": null,
+    "code": "S602",
+    "end_location": {
+      "column": 27,
+      "row": 5
+    },
+    "filename": "/src/app/run.py",
+    "fix": null,
+    "location": {
+      "column": 12,
+      "row": 5
+    },
+    "message": "`subprocess` call with `shell=True` identified, security issue",
+    "name": "subprocess-popen-with-shell-equals-true",
+    "noqa_row": 5,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/subprocess-popen-with-shell-equals-true"
+  },
+  {
+    "cell": null,
+    "code": "S301",
+    "end_location": {
+      "column": 38,
+      "row": 4
+    },
+    "filename": "/src/app/store.py",
+    "fix": null,
+    "location": {
+      "column": 12,
+      "row": 4
+    },
+    "message": "`pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue",
+    "name": "suspicious-pickle-usage",
+    "noqa_row": 4,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/suspicious-pickle-usage"
+  },
+  {
+    "cell": null,
+    "code": "S506",
+    "end_location": {
+      "column": 21,
+      "row": 4
+    },
+    "filename": "/src/app/yaml_load.py",
+    "fix": null,
+    "location": {
+      "column": 12,
+      "row": 4
+    },
+    "message": "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`.",
+    "name": "unsafe-yaml-load",
+    "noqa_row": 4,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unsafe-yaml-load"
+  }
+]
