@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { performance } from 'node:perf_hooks'
+import { startObservation } from '@langfuse/tracing'
 
 export interface RunSpec {
   tool: string // 'bandit' | 'ruff' | 'tsc' | 'oxlint'
@@ -150,14 +151,62 @@ export const runHost = (spec: RunSpec): Promise<RunResult> => {
 
 /**
  * Runs an analyzer command inside isolated sandbox (docker or host backend).
+ * Emits a subprocess.<tool> tool observation span with duration, exit code, and timeout status.
  */
 export const runIsolated = async (
   spec: RunSpec,
   backend: 'docker' | 'host'
 ): Promise<RunResult> => {
-  if (backend === 'docker') {
-    const { runDocker } = await import('./docker')
-    return runDocker(spec)
+  const obs = startObservation(
+    `subprocess.${spec.tool}`,
+    {
+      input: { cmd: spec.cmd, args: spec.args },
+    },
+    { asType: 'tool' }
+  )
+
+  let result: RunResult
+  try {
+    if (backend === 'docker') {
+      const { runDocker } = await import('./docker')
+      result = await runDocker(spec)
+    } else {
+      result = await runHost(spec)
+    }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    obs.update({
+      level: 'ERROR',
+      statusMessage: errorMsg,
+      metadata: { backend, status: 'error', timeoutMs: spec.timeoutMs },
+    })
+    obs.end()
+    throw err
   }
-  return runHost(spec)
+
+  const durationMs = 'durationMs' in result ? result.durationMs : 0
+  const exitCode = 'exitCode' in result ? result.exitCode : null
+  const status = result.status
+
+  const level =
+    status === 'timeout' ? 'WARNING' : status === 'error' ? 'ERROR' : 'DEFAULT'
+
+  obs.update({
+    output: 'stdout' in result ? result.stdout.slice(0, 1000) : '',
+    level,
+    statusMessage:
+      status === 'timeout'
+        ? `Subprocess ${spec.tool} timed out after ${spec.timeoutMs}ms`
+        : undefined,
+    metadata: {
+      backend,
+      exitCode,
+      status,
+      timeoutMs: spec.timeoutMs,
+      durationMs,
+    },
+  })
+  obs.end()
+
+  return result
 }

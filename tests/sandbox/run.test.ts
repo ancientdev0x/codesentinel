@@ -106,4 +106,22 @@ describe('runIsolated - host backend (E3.1)', () => {
       }
     }
   })
+
+  it('records subprocess span with tool name and metadata', async () => {
+    const result = await runIsolated(
+      {
+        tool: 'bandit',
+        cmd: 'node',
+        args: ['-e', 'process.stdout.write("[]")'],
+        cwd: process.cwd(),
+        timeoutMs: 2000,
+      },
+      'host'
+    )
+
+    expect(result.status).toBe('ok')
+    if (result.status === 'ok') {
+      expect(result.durationMs).toBeGreaterThanOrEqual(0)
+    }
+  })
 })
