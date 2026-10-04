@@ -45,7 +45,7 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E0.2 Add the shared `Finding` model in `src/review/findings.ts` (type, ids, dedupe, severity order)
   - [x] E0.3 Make the review workflow honor its payload (`input` schema + `resolveReviewConfig(input, env)`)
   - [x] E0.4 Add feature flags in config + `action.yml` inputs (`STATIC_ANALYSIS`, `SANDBOX`, `AST_CHECKS`, `HITL_MODE`, `LANGFUSE_*`)
-  - [ ] E0.5 Add test fixtures: `tests/fixtures/vuln-repo/` (seeded Python + TS vulns, a git repo built at test time)
+  - [x] E0.5 Add test fixtures: `tests/fixtures/vuln-repo/` (seeded Python + TS vulns, a git repo built at test time)
   - [ ] E0.6 Get approval for the dependency list below (AGENTS.md rule)
 - [ ] **E1 PR URL ingestion** (C1): [`E1-pr-url-ingestion.md`](E1-pr-url-ingestion.md) *(~1d)*
   - [ ] E1.1 `parsePrUrl()` + tests

@@ -85,7 +85,7 @@ Add to `ReviewPayload` and `ReviewConfig`. Precedence is payload, then env, then
 - Add matching `action.yml` inputs and env mappings next to the existing ones (pattern at `action.yml` around lines 75–105). **This is a CI edit, so it needs approval.**
 - **Accept:** config tests cover precedence for each flag.
 
-## E0.5 Vulnerable fixture repo
+## E0.5 Vulnerable fixture repo [x]
 **Dir:** `tests/fixtures/vuln-repo/` holds the plain source files. Do **not** commit a nested `.git`.
 
 Write `tests/helpers/makeRepo.ts`. It copies the fixture into a tmp dir, runs `git init`, commits a "base" version (the clean files), then applies the "head" version (the vulnerable edits) as a second commit, and returns `{dir, baseSha, headSha}`.
