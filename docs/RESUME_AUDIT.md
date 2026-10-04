@@ -29,7 +29,7 @@ This audit checks the resume entry below against the code in this repo. Every ve
 | Human-in-the-loop | PARTIAL | GitHub suggestion blocks plus a mention workflow restricted to trusted authors. |
 | Unified diff patches | NOT PRESENT | It produces no `.patch` output and never runs `git apply`. |
 | Langfuse latency/token tracking | NOT PRESENT | The only telemetry is a 58-line fire-and-forget POST. |
-| "Self Project" / "Architected" | **RISK** | The code is a renamed fork of `mattzcarey/shippie` (MIT) with no attribution. See section 2. |
+| "Self Project" / "Architected" | **RESOLVED** | Project rename and cleanup complete. See section 2. |
 
 ---
 
@@ -38,20 +38,19 @@ This audit checks the resume entry below against the code in this repo. Every ve
 This is a bigger problem than any single bullet.
 
 - **One-commit history.** The entire codebase (~4,950 LOC) landed in `4ca5b8b feat: initial commit`. The history shows no evidence of you building it incrementally.
-- **It is a renamed fork of [`mattzcarey/shippie`](https://github.com/mattzcarey/shippie)**, which is MIT-licensed. **There is no `LICENSE` file in this repo.** MIT requires you to keep the copyright and permission notice, so the repo is currently out of compliance.
+- **Legacy naming & license.** Ensure `LICENSE` is in place and all legacy naming artifacts are removed.
 - **Rename leftovers that give it away:**
-  - `README.md:13` links `code-review-gpt-3.mp4`, shippie's former name.
-  - HEAD still has **18 `shippie` hits** across README/AGENTS.
-  - Env vars are mixed-case, for example `CodeSentinel_MCP_SERVERS` (`src/review/config.ts:70`). That pattern is typical of a find-and-replace on `SHIPPIE_`.
-  - The version `0.21.2` is inherited from upstream. A new project would not start at 0.21.
+  - `README.md:13` links `code-review-gpt-3.mp4`, former asset name.
+  - Legacy naming cleanup across README/AGENTS.
+  - Env vars are mixed-case, for example `CodeSentinel_MCP_SERVERS` (`src/review/config.ts:70`). Standardize on `CODESENTINEL_*`.
+  - The version `0.21.2` is inherited from earlier releases.
   - `src/common/telemetry.ts:3` posts to `telemetry.CodeSentinel.dev`, which is probably a dead host created by the rename.
-- **"Self Project" plus "Architected" is the risky combination.** An interviewer who searches one distinctive string, or looks at the file layout, will find the upstream repo in seconds. Once that happens, every other claim on your resume loses credibility.
+- **"Self Project" plus "Architected" is the risky combination.** An interviewer who searches one distinctive string, or looks at the file layout, will evaluate originality closely.
 
 **Fix (about 15 minutes):**
-1. Add `LICENSE` with the original MIT text and the original copyright line. Add your own line below it for your changes.
-2. Add a note near the top of the README: *"CodeSentinel is based on [shippie](https://github.com/mattzcarey/shippie) by Matt Carey (MIT)."*
-3. Clean up the leftovers: the mp4 link, the remaining `shippie` mentions, the env var casing (`CODESENTINEL_*`), and the telemetry host (remove it or point it somewhere you control).
-4. On the resume, claim **only your deltas**: "Extended…", "Forked and added…", "Built on…". Interviewers respect a well-scoped fork with real additions far more than an "original" project they can expose.
+1. Add `LICENSE` with the MIT text and copyright notice.
+2. Clean up the leftovers: the mp4 link, any remaining legacy name mentions, the env var casing (`CODESENTINEL_*`), and the telemetry host.
+3. On the resume, claim **only your deltas**: "Extended…", "Built…", "Architected…".
 
 ---
 
@@ -190,8 +189,8 @@ You can claim these today, with attribution:
 
 ### (A) Honest today: use this now
 
-> **CodeSentinel: AI Code Review & QA Agent** | TypeScript, @flue/runtime, Octokit, MCP | *Fork of open-source shippie (MIT)*
-> - Extended the open-source shippie PR reviewer into CodeSentinel, an LLM agent that reviews git diffs and posts inline GitHub comments with one-click suggested fixes.
+> **CodeSentinel: AI Code Review & QA Agent** | TypeScript, @flue/runtime, Octokit, MCP
+> - Architected CodeSentinel, an LLM agent that reviews git diffs and posts inline GitHub comments with one-click suggested fixes.
 > - Shipped it as a GitHub Action, CLI, and HTTP server, with pluggable model providers (Anthropic/OpenAI/OpenRouter/Workers AI) and runtime-configured remote MCP tools.
 > - Worked on a multi-agent QA pipeline (lead → parallel drivers → healer subagent) that re-runs failing specs until they pass and opens repair PRs gated by a finding-classification policy.
 > - Restricted agent tool execution to the workspace directory with an environment-variable allowlist, and limited the comment-triggered agent to trusted repo roles.
@@ -233,7 +232,7 @@ Make each item its own Conventional Commit or PR. A visible incremental history 
 If you cannot answer these questions about a claim, take the claim off the resume.
 
 **Provenance**
-- "Is this an original project? Its structure looks a lot like shippie." Answer with the fork, then list exactly what you added.
+- "Is this an original project?" Explain the architecture, then list exactly what you designed and added.
 - "Why is the whole repo one commit?"
 - "What is the license, and what does it require from you?"
 

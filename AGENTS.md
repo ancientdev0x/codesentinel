@@ -19,7 +19,7 @@
 - Lint + format: `npm run check` (oxlint + oxfmt). Auto-fix: `npm run check:fix`.
 - Type-check: `npm run check:types` (`tsc --noEmit`).
 - Build: `npm run build` (`flue build --target node` → `dist/server.mjs`).
-- Run a review locally: `npm run review` (`flue run review --target node`); reviews **staged** changes and writes to `.shippie/review/`. Pass `--payload '{"platform":"local"}'` explicitly if needed.
+- Run a review locally: `npm run review` (`flue run review --target node`); reviews **staged** changes and writes to `.CodeSentinel/review/`. Pass `--payload '{"platform":"local"}'` explicitly if needed.
 - Run the built server: `npm start` (`node dist/server.mjs`), then `POST /workflows/review?wait=result`.
 - Tests: `npm test` (vitest).
 
@@ -32,7 +32,7 @@
 ## Models & MCP
 
 - Model is a `provider/model` string (e.g. `anthropic/claude-sonnet-4-6`, `openai/gpt-4.1-mini`, `cloudflare-workers-ai/@cf/openai/gpt-oss-120b`). Provider keys are standard env vars (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID`).
-- MCP servers are configured via the Action input `MCP_SERVERS` / env `SHIPPIE_MCP_SERVERS` (remote HTTP/SSE only) — **not** a checked-in `.mcp.json`.
+- MCP servers are configured via the Action input `MCP_SERVERS` / env `CodeSentinel_MCP_SERVERS` (remote HTTP/SSE only) — **not** a checked-in `.mcp.json`.
 - Project context: the reviewer reads root `AGENTS.md` / `CLAUDE.md` and flue auto-discovers skills in `.agents/skills/`.
 
 ## Commit and Pull Request Guidelines

@@ -1,12 +1,12 @@
 # Helps you ship faster 🚢
 
-Shippie is an extendable code-review agent. It runs an agent loop that reads your diff, explores the codebase with real developer tools, and posts focused review comments — picking up issues a human reviewer would, such as:
+CodeSentinel is an extendable code-review agent. It runs an agent loop that reads your diff, explores the codebase with real developer tools, and posts focused review comments — picking up issues a human reviewer would, such as:
 
 - Exposed secrets
 - Slow or inefficient code
 - Potential bugs or unhandled edge cases
 
-Shippie can also act as a Model Context Protocol (MCP) client to reach external tools like browser automation, observability and documentation.
+CodeSentinel can also act as a Model Context Protocol (MCP) client to reach external tools like browser automation, observability and documentation.
 
 ## Demo
 
@@ -26,11 +26,11 @@ https://github.com/user-attachments/assets/code-review-gpt-3.mp4
 
 ### GitHub Action
 
-Run `npx shippie init` to scaffold the workflow below, then add your provider API key as a repo secret. Or add it manually — it needs a full checkout (`fetch-depth: 0`), PR write permissions, and a provider API key.
-
+Run `npx CodeSentinel init` to scaffold the workflow below, then add your provider API key as a repo secret. Or add it manually — it needs a full checkout (`fetch-depth: 0`), PR write permissions, and a provider API key.
+ 
 ```yaml
-# .github/workflows/shippie.yml
-name: Shippie
+# .github/workflows/CodeSentinel.yml
+name: CodeSentinel
 
 on:
   pull_request:
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: mattzcarey/shippie@v0
+      - uses: ancientdev0x/CodeSentinel@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -56,31 +56,31 @@ See [Action Options](docs/action-options.md) for all inputs (`MODEL`, `THINKING_
 
 ### Local
 
-Run the review workflow locally with no server. Local mode reviews your staged changes (`git diff --cached`) and writes results to `.shippie/review/local_*.md`:
+Run the review workflow locally with no server. Local mode reviews your staged changes (`git diff --cached`) and writes results to `.CodeSentinel/review/local_*.md`:
 
 ```bash
-npx shippie review
+npx CodeSentinel review
 ```
 
-### Run on demand with `/shippie`
+### Run on demand with `/codesentinel`
 
-Comment `/shippie review` on a pull request to run shippie on demand — either via a GitHub Actions workflow (no server) or a deployed webhook channel. See [Run Shippie on demand](docs/tag-shippie.md).
+Comment `/codesentinel review` on a pull request to run CodeSentinel on demand — either via a GitHub Actions workflow (no server) or a deployed webhook channel. See [Run CodeSentinel on demand](docs/tag-CodeSentinel.md).
 
 ---
 
 ## Setup Instructions 💫
 
-See the [setup instructions](docs/setup.md) for more docs on how to set up shippie in your CI/CD pipeline and run it locally.
+See the [setup instructions](docs/setup.md) for more docs on how to set up CodeSentinel in your CI/CD pipeline and run it locally.
 
 ### Additional Documentation
 
-- [Setup](docs/setup.md) - Get shippie running in CI and locally
+- [Setup](docs/setup.md) - Get CodeSentinel running in CI and locally
 - [AI Provider Configuration](docs/ai-provider-config.md) - Configure Anthropic, OpenAI, OpenRouter, and Cloudflare Workers AI
 - [Action Options](docs/action-options.md) - GitHub Action configuration options
-- [Model Context Protocol (MCP)](docs/mcp.md) - Give shippie access to external tools
+- [Model Context Protocol (MCP)](docs/mcp.md) - Give CodeSentinel access to external tools
 - [Rules Files](docs/rules-files.md) - Inject project context via AGENTS.md / CLAUDE.md and Agent Skills
 - [Subagent Tool](docs/subagent-tool.md) - Delegate work to flue subagents with the task tool
-- [On-demand /shippie](docs/tag-shippie.md) - Run shippie by commenting /shippie (Actions or webhook)
+- [On-demand /codesentinel](docs/tag-CodeSentinel.md) - Run CodeSentinel by commenting /codesentinel (Actions or webhook)
 
 ---
 
@@ -90,8 +90,8 @@ This repo targets Node >= 22.19 with npm.
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/mattzcarey/shippie.git
-   cd shippie
+   git clone https://github.com/ancientdev0x/CodeSentinel.git
+   cd CodeSentinel
    ```
 
 2. **Install dependencies:**
