@@ -40,7 +40,7 @@ export const ingest = (deps: IngestDeps = {}) => {
         cfg.workspace = materialized.workspace
         cfg.baseSha = materialized.baseSha
         cfg.headSha = materialized.headSha
-        if (token && cfg.platform !== 'local') {
+        if (token && process.env.CodeSentinel_INPUT_PLATFORM !== 'local') {
           cfg.github = {
             owner: prRef.owner,
             repo: prRef.repo,

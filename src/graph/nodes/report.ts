@@ -52,19 +52,27 @@ export const report = (deps: ReportDeps = {}) => {
     // Build final summary
     let summaryText = state.summary.trim()
     if (!summaryText) {
-      summaryText = `CodeSentinel reviewed ${state.files.length} changed files and recorded ${allFindings.length} findings.`
+      summaryText = 'CodeSentinel completed the review; see the inline comments.'
     }
 
     if (state.degraded.length > 0) {
       summaryText += `\n\n> ⚠️ **Degraded components / tools**: ${state.degraded.join(', ')}`
     }
 
-    await reporter.postSummary(summaryText).catch((err) => {
-      console.warn('[CodeSentinel] Failed to post review summary:', err)
-    })
+    const hasRows = state.analyzerReports && state.analyzerReports.length > 0
+    const summaryUrl = hasRows
+      ? await reporter.postSummary(summaryText, state.analyzerReports).catch((err) => {
+          console.warn('[CodeSentinel] Failed to post review summary:', err)
+          return undefined
+        })
+      : await reporter.postSummary(summaryText).catch((err) => {
+          console.warn('[CodeSentinel] Failed to post review summary:', err)
+          return undefined
+        })
 
     return {
       summary: summaryText,
+      summaryUrl: summaryUrl ?? null,
       attempts,
     }
   }

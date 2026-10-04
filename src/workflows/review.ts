@@ -1,24 +1,15 @@
+import { randomUUID } from 'node:crypto'
 import { type JsonValue, type WorkflowRouteHandler, defineWorkflow } from '@flue/runtime'
 import * as v from 'valibot'
 import reviewer from '../agents/reviewer'
-import type { AnalyzerReportRow } from '../common/formatting/summary'
 import { sendReviewStarted } from '../common/telemetry'
-import { createReporter } from '../github/reporter'
+import { deleteCollector } from '../graph/collector'
+import { buildReviewGraph } from '../graph/review-graph'
+import type { StageError } from '../graph/state'
 import { flushTracing, initTracing } from '../observability/langfuse'
-import { tracedPrompt } from '../observability/tokens'
-import { runStaticAnalysis } from '../review/analyzers'
-import {
-  applyPayloadToEnv,
-  type ReviewPayload,
-  resolveReviewConfig,
-} from '../review/config'
-import { runAstChecks } from '../review/ast/checks'
-import { extractAllFragments } from '../review/ast/fragments'
-import { buildReviewPrompt } from '../review/context'
-import { dedupeFindings, type Finding } from '../review/findings'
-import { type ReviewFileWithDiff, getChangedFiles } from '../review/diff'
-import { materializePr, parsePrUrl } from '../review/source'
-import { filterFiles } from '../review/utils/filterFiles'
+import type { PromptableSession } from '../observability/tokens'
+import { type ReviewPayload, resolveReviewConfig } from '../review/config'
+import { dedupeFindings } from '../review/findings'
 
 /**
  * Permissive top-level object schema for workflow run payload.
@@ -49,17 +40,6 @@ export const ReviewWorkflowInputSchema = v.object({
 })
 
 /**
- * One-shot code review, exposed as `POST /workflows/review` on the built server
- * (`node dist/server.mjs`) and runnable via `flue run review`.
- *
- * flue beta.9 shape: a workflow is `defineWorkflow({ agent, run })`. The run
- * handler computes the PR diff, drives the reviewer agent over the shared harness
- * (it posts inline comments via `suggest_change`), then posts the summary. Config
- * resolves from the payload and environment (the reviewer agent resolves the same way),
- * so the agent and workflow stay in lockstep.
- */
-
-/**
  * Opt the workflow into HTTP transport — `POST /workflows/review` on the built server.
  * beta.9 only exposes a discovered workflow over HTTP when it exports a `route`
  * middleware (otherwise it is dispatch-only); this pass-through is enough.
@@ -76,40 +56,43 @@ export default defineWorkflow({
       | ReviewPayload
       | undefined
     const cfg = resolveReviewConfig(input, process.env)
+    if (input?.platform) {
+      process.env.CodeSentinel_INPUT_PLATFORM = input.platform
+    } else {
+      delete process.env.CodeSentinel_INPUT_PLATFORM
+    }
+    const runId = randomUUID()
+    process.env.CodeSentinel_RUN_ID = runId
+    process.env.CODESENTINEL_RUN_ID = runId
 
     let cleanupPr: (() => Promise<void>) | undefined
     try {
-      if (cfg.prUrl) {
-        const prRef = parsePrUrl(cfg.prUrl)
-        const token = process.env.GITHUB_TOKEN
-        const materialized = await materializePr(prRef, token)
-        cleanupPr = materialized.cleanup
-        cfg.workspace = materialized.workspace
-        cfg.baseSha = materialized.baseSha
-        cfg.headSha = materialized.headSha
-        if (token && input?.platform !== 'local') {
-          cfg.github = {
-            owner: prRef.owner,
-            repo: prRef.repo,
-            prNumber: prRef.number,
-            token,
-          }
-          cfg.platform = 'github'
+      let sessionInstance: PromptableSession | undefined
+      const graph = buildReviewGraph({
+        ingest: {
+          onCleanupPr: (cleanup) => {
+            cleanupPr = cleanup
+          },
+        },
+        llmTriage: {
+          sessionFactory: async () => {
+            if (!sessionInstance) {
+              sessionInstance = await harness.session()
+            }
+            return sessionInstance
+          },
+        },
+      })
+
+      const finalState = await graph.invoke(
+        { cfg },
+        {
+          configurable: { thread_id: runId },
+          recursionLimit: 25,
         }
-      }
-      applyPayloadToEnv(cfg, process.env)
+      )
 
-      const { files } = await getChangedFiles(cfg)
-      let filtered = filterFiles(files, cfg.ignore, cfg.workspace) as ReviewFileWithDiff[]
-
-      if (filtered.length > 300) {
-        console.warn(
-          `[CodeSentinel] PR contains ${filtered.length} changed files; capping review at 300 files.`
-        )
-        filtered = filtered.slice(0, 300)
-      }
-
-      if (filtered.length === 0) {
+      if (finalState.files.length === 0) {
         return {
           reviewed: 0,
           summaryPosted: false,
@@ -124,57 +107,38 @@ export default defineWorkflow({
           platform: cfg.platform,
           model: cfg.model,
         },
-        filtered.length
+        finalState.files.length
       )
 
-      const session = await harness.session()
-
-      const fragments = cfg.astChecks ? extractAllFragments(filtered) : []
-      const astFindings = cfg.astChecks ? runAstChecks(filtered) : []
-
-      let analyzerFindings: Finding[] = []
-      let analyzerRows: AnalyzerReportRow[] = []
-
-      if (cfg.staticAnalysis) {
-        const filePaths = filtered.map((f) => f.fileName)
-        const analysis = await runStaticAnalysis(cfg, filePaths)
-        analyzerFindings = analysis.findings
-        analyzerRows = analysis.reports
-      }
-
-      const allFindings = dedupeFindings([...astFindings, ...analyzerFindings])
-
-      const prompt = buildReviewPrompt(
-        {
-          files: filtered,
-          fragments,
-          findings: allFindings,
-          astChecks: cfg.astChecks,
-        },
-        cfg.workspace
+      const crashError = finalState.errors?.find(
+        (e: StageError) => e.stage === 'llm_triage' && e.kind === 'crash'
       )
-      // Use the agent's final message as the summary rather than a structured
-      // `result` schema: response_format/json_schema is not supported by every
-      // provider (e.g. Cloudflare Workers AI returns 400), and a free-text final
-      // message keeps the workflow model-agnostic.
-      const response = await tracedPrompt(session, prompt, { model: cfg.model })
-      const summary =
-        response.text?.trim() ||
-        'CodeSentinel completed the review; see the inline comments.'
-
-      const reporter = createReporter(cfg)
-      const summaryUrl =
-        analyzerRows.length > 0
-          ? await reporter.postSummary(summary, analyzerRows)
-          : await reporter.postSummary(summary)
-
-      return {
-        reviewed: filtered.length,
-        summaryPosted: Boolean(summaryUrl),
-        summaryUrl: summaryUrl ?? null,
-        summary,
+      if (crashError) {
+        throw new Error(crashError.detail)
       }
+
+      const confirmedFindings = [
+        ...finalState.staticFindings.filter((f) => f.status === 'confirmed'),
+        ...finalState.llmFindings,
+      ]
+      const findings = dedupeFindings(confirmedFindings)
+
+      const result = {
+        reviewed: finalState.files.length,
+        summaryPosted: Boolean(finalState.summaryUrl),
+        summaryUrl: finalState.summaryUrl ?? null,
+        summary: finalState.summary,
+      }
+
+      Object.defineProperties(result, {
+        findings: { value: findings, enumerable: false },
+        degraded: { value: finalState.degraded, enumerable: false },
+        attempts: { value: finalState.attempts, enumerable: false },
+      })
+
+      return result as unknown as JsonValue
     } finally {
+      deleteCollector(runId)
       await flushTracing().catch((err) => {
         console.warn('[CodeSentinel] Failed to flush Langfuse tracing:', err)
       })

@@ -111,12 +111,32 @@ Both workflows follow the same flue shape — `defineWorkflow({ agent, input, ru
 serves `POST /workflows/<name>` automatically.
 
 **Review workflow** (`src/workflows/review.ts`):
-`input` (valibot schema) → `resolveReviewConfig` (`src/review/config.ts`) → compute git
-diff (`src/review/diff.ts`) → build prompt context (inject `AGENTS.md`/`CLAUDE.md`
-from the workspace root + the diff + per-file info from `src/review/prompt/fileInfo.ts`)
-→ run the `reviewer` agent (`src/agents/reviewer.ts`) with `suggest_change` +
-`open_pull_request` tools → report via `src/github/reporter.ts` (GitHub Octokit, or
-`.CodeSentinel/review/local_*.md` in local mode).
+`input` (valibot schema) → `resolveReviewConfig` (`src/review/config.ts`) → executes the LangGraph cyclic review state engine (`src/graph/review-graph.ts`):
+- `ingest`: clones/materializes PR if `prUrl` (`src/review/source.ts`), otherwise reads changed git diff with 300-file cap (`src/review/diff.ts`).
+- `extract_ast`: parses language syntax trees and extracts targeted code fragments and AST checks (`src/review/ast/*`).
+- `static_analysis`: sandboxed Bandit + Ruff + TypeScript analysis inside isolated Docker or host container (`src/review/analyzers/*`).
+- `llm_triage`: flue agent loop drives contextual review and triage via `record_finding` and `triage_finding` tools (`src/tools/*`).
+- `validate`: strict validation enforcing diff range intersection, triage decisions on pre-detected findings, and patch format (`src/graph/nodes/validate.ts`).
+- `failure_analysis`: deterministic error classification that routes retry cycles (with doubled timeouts, backend fallbacks, or violation hints) or marks unrecoverable stages as degraded (`src/graph/nodes/failure-analysis.ts`).
+- `human_review`: human-in-the-loop inspection checkpoint.
+- `report`: deduplication, inline comment reporting, and PR summary generation (`src/github/reporter.ts`).
+
+```mermaid
+graph TD;
+	__start__([start]) --> ingest[ingest];
+	ingest --> extract_ast[extract_ast];
+	extract_ast --> static_analysis[static_analysis];
+	static_analysis --> llm_triage[llm_triage];
+	static_analysis -.->|timeout / unavailable| failure_analysis[failure_analysis];
+	llm_triage --> validate[validate];
+	validate --> human_review[human_review];
+	validate -.->|out_of_diff / invalid_output| failure_analysis;
+	failure_analysis -.->|retry static_analysis| static_analysis;
+	failure_analysis -.->|retry llm_triage| llm_triage;
+	failure_analysis -.->|degraded| human_review;
+	human_review --> report[report];
+	report --> __end__([end]);
+```
 
 **QA workflow** (`src/workflows/qa.ts`):
 `input` (valibot) → `resolveQaConfig` (`src/qa/config.ts`, which reuses the review

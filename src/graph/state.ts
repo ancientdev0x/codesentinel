@@ -5,9 +5,10 @@ import {
   StateSchema,
 } from '@langchain/langgraph'
 import { z } from 'zod'
+import type { AnalyzerReportRow } from '../common/formatting/summary'
+import type { CodeFragment } from '../review/ast/fragments'
 import type { ReviewConfig } from '../review/config'
 import type { ReviewFileWithDiff } from '../review/diff'
-import type { CodeFragment } from '../review/ast/fragments'
 import type { Finding } from '../review/findings'
 
 export interface StageError {
@@ -45,7 +46,9 @@ export const ReviewState = new StateSchema({
   fragments: z.array(z.custom<CodeFragment>()).default([]),
   staticFindings: z.array(z.custom<Finding>()).default([]),
   llmFindings: z.array(z.custom<Finding>()).default([]),
+  analyzerReports: z.array(z.custom<AnalyzerReportRow>()).default([]),
   summary: z.string().default(''),
+  summaryUrl: z.string().nullable().default(null),
   attempts: z.record(z.string(), z.number()).default({}), // per node: { llm_triage: 1, static_analysis: 0 }
   errors: new ReducedValue(
     z.array(z.custom<StageError>()).default(() => []),

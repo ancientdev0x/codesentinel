@@ -31,12 +31,17 @@ export const staticAnalysis = (deps: StaticAnalysisDeps = {}) => {
       }
 
       const skipTools = new Set(state.recovery?.adjust?.skipTools ?? [])
-      const requestedTools = (['bandit', 'ruff', 'tsc'] as AnalyzerToolName[]).filter(
-        (t) => !skipTools.has(t) && !state.degraded.includes(t)
-      )
+      const hasRestrictions = skipTools.size > 0 || state.degraded.length > 0
+      const requestedTools = hasRestrictions
+        ? (['bandit', 'ruff', 'tsc'] as AnalyzerToolName[]).filter(
+            (t) => !skipTools.has(t) && !state.degraded.includes(t)
+          )
+        : undefined
 
       const filePaths = state.files.map((f) => f.fileName)
-      const result = await doRunStaticAnalysis(adjustedCfg, filePaths, requestedTools)
+      const result = requestedTools
+        ? await doRunStaticAnalysis(adjustedCfg, filePaths, requestedTools)
+        : await doRunStaticAnalysis(adjustedCfg, filePaths)
 
       const errors: StageError[] = []
       for (const run of result.runs) {
@@ -64,7 +69,8 @@ export const staticAnalysis = (deps: StaticAnalysisDeps = {}) => {
       }
 
       return {
-        staticFindings: [...state.staticFindings, ...result.findings],
+        staticFindings: [...(state.staticFindings ?? []), ...(result.findings ?? [])],
+        analyzerReports: [...(state.analyzerReports ?? []), ...(result.reports ?? [])],
         errors,
         attempts,
       }

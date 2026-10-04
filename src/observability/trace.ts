@@ -95,10 +95,13 @@ export const updateActiveTrace = (input: TraceMetadataInput): void => {
 /**
  * Higher-order function wrapping a LangGraph state machine node in an active Langfuse span.
  */
-export const withNodeSpan = <S extends { attempts?: Record<string, number> }>(
+export const withNodeSpan = <
+  S extends { attempts?: Record<string, number> },
+  R = unknown,
+>(
   name: string,
-  fn: (s: S) => Promise<Partial<S> | void>
-): ((s: S) => Promise<Partial<S> | void>) => {
+  fn: (s: S) => Promise<R>
+): ((s: S) => Promise<R>) => {
   return (state: S) => {
     return startActiveObservation(`node.${name}`, async (span) => {
       const attempt = state?.attempts?.[name] ?? 0
