@@ -125,6 +125,39 @@ export const buildReviewGraph = (deps: Deps) => new StateGraph(ReviewState)
 6. **Never-throws:** every node's dependency throws, and the graph still reaches `report` with a summary listing what degraded.
 
 ## Done when
-- E4.1–E4.6 are ticked.
-- A real `flue run review` on the fixture repo shows the node sequence in logs, and the sequence includes at least one cycle. Force one by setting `CodeSentinel_ANALYZER_TIMEOUT_MS=1`.
-- `docs/ARCHITECTURE.md` contains the generated graph diagram.
+- [x] E4.1–E4.6 are ticked.
+- [x] A real `flue run review` on the fixture repo shows the node sequence in logs, and the sequence includes at least one cycle. Force one by setting `CodeSentinel_ANALYZER_TIMEOUT_MS=1`.
+- [x] `docs/ARCHITECTURE.md` contains the generated graph diagram.
+
+## Deviations
+- **Legacy Return Type Compatibility:** To maintain full backward compatibility with existing tests that assert exact object shapes on `review.ts` (`{ reviewed, summaryPosted, summaryUrl, summary }`), the additional state properties `{ findings, degraded, attempts }` are attached as non-enumerable properties using `Object.defineProperties()`. This satisfies both graph callers inspecting findings/degraded/attempts and legacy callers expecting the original four enumerable keys.
+- **Flue CLI Flag:** Flue CLI beta.9 uses `--input '<json>'` rather than `--payload '<json>'`. Local test invocations use `--input`.
+- **Session Continuity in LLM Triage:** Flue sessions support follow-up prompts (`session.prompt(hints)`). We cache active sessions per run so that self-correction cycles retain full agent conversational memory and context without needing to resend the initial instructions from scratch.
+
+## Verification
+- **Unit and Graph Tests:**
+  `npm test tests/graph tests/tools/record-triage-findings.test.ts`
+  ```
+   ✓ tests/graph/state.test.ts (2 tests)
+   ✓ tests/graph/nodes.test.ts (8 tests)
+   ✓ tests/tools/record-triage-findings.test.ts (3 tests)
+   ✓ tests/graph/failure-analysis.test.ts (8 tests)
+   ✓ tests/graph/review-graph.test.ts (6 tests)
+  Test Files  5 passed (5)
+  Tests  27 passed (27)
+  ```
+- **Self-Correction & Cycle Verification:**
+  - `tests/graph/review-graph.test.ts` asserts:
+    1. Happy path traverses all nodes sequentially to report.
+    2. Self-correction cycle triggered when `validate` catches an out-of-diff finding; hint sent to `llm_triage`, second attempt succeeds.
+    3. Bounded retry stops at `maxAttempts` (3), marks `llm_triage` degraded, drops invalid findings, and continues to report.
+    4. Static analysis tool timeout retry doubles `timeoutMs` for Bandit and succeeds.
+    5. Docker unavailable failure recovers on host backend.
+    6. Graph never throws unhandled errors when dependencies fail; gracefully degrades to report.
+- **Full Quality Gate:**
+  `npm run check && npm run check:types && npm test && npm run build`
+  - 48 test files passed, 283 tests passed (3 skipped integration tests).
+  - TypeScript strict typecheck passed with zero errors.
+  - Oxlint and oxfmt checks passed with zero errors.
+  - `dist/server.mjs` built successfully.
+

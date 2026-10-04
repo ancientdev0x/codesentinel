@@ -66,13 +66,13 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E3.5 Regression signals: Ruff F/E9 (undefined names, syntax errors) + `tsc --noEmit` / oxlint on TS changes
   - [x] E3.6 `run_static_analysis` flue tool (agent can re-run on demand)
   - [x] E3.7 Action wiring (install analyzers / build image) + summary section
-- [ ] **E4 LangGraph cyclic state engine** (C3): [`E4-langgraph-engine.md`](E4-langgraph-engine.md) *(~2.5d, after E1–E3)*
-  - [ ] E4.1 State schema (`src/graph/state.ts`)
-  - [ ] E4.2 Nodes: ingest, extract_ast, static_analysis, llm_triage, validate, failure_analysis, report
-  - [ ] E4.3 Replace direct posting: `record_finding` tool collects into state; posting moves to `report`
-  - [ ] E4.4 Failure analysis + recovery routing (conditional edges, bounded retries, degrade paths)
-  - [ ] E4.5 Checkpointer + thread ids; `review.ts` invokes the graph
-  - [ ] E4.6 Graph tests with a fake LLM node (cycle taken, cycle bounded, degrade path)
+- [x] **E4 LangGraph cyclic state engine** (C3): [`E4-langgraph-engine.md`](E4-langgraph-engine.md) *(~2.5d, after E1–E3)*
+  - [x] E4.1 State schema (`src/graph/state.ts`)
+  - [x] E4.2 Nodes: ingest, extract_ast, static_analysis, llm_triage, validate, failure_analysis, report
+  - [x] E4.3 Replace direct posting: `record_finding` tool collects into state; posting moves to `report`
+  - [x] E4.4 Failure analysis + recovery routing (conditional edges, bounded retries, degrade paths)
+  - [x] E4.5 Checkpointer + thread ids; `review.ts` invokes the graph
+  - [x] E4.6 Graph tests with a fake LLM node (cycle taken, cycle bounded, degrade path)
 - [ ] **E5 Human-in-the-loop + unified diff patches** (C4a): [`E5-hitl-patches.md`](E5-hitl-patches.md) *(~2d, after E4)*
   - [ ] E5.1 `buildPatch()`: finding fix → unified diff via `git diff --no-index`, verified with `git apply --check`
   - [ ] E5.2 `human_review` node using LangGraph `interrupt()`
