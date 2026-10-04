@@ -4,6 +4,7 @@ import { createReporter } from '../github/reporter'
 import { connectMcpServers } from '../mcp/connect'
 import { resolveReviewConfig } from '../review/config'
 import { buildInstructions } from '../review/instructions'
+import { createRunStaticAnalysisTool } from '../tools/run-static-analysis'
 import { createSuggestChangeTool } from '../tools/suggest-change'
 
 /**
@@ -31,6 +32,10 @@ export default createAgent(async ({ env }) => {
     sandbox: local({ cwd: cfg.workspace }),
     cwd: cfg.workspace,
     instructions: await buildInstructions(cfg),
-    tools: [createSuggestChangeTool(reporter), ...mcp.tools],
+    tools: [
+      createSuggestChangeTool(reporter),
+      createRunStaticAnalysisTool(cfg),
+      ...mcp.tools,
+    ],
   }
 })
