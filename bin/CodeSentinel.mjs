@@ -230,9 +230,12 @@ if (!existsSync(serverPath)) {
 const port = 1024 + Math.floor(Math.random() * 60000)
 const base = `http://127.0.0.1:${port}`
 let prUrl
+let interactive = false
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i]
-  if (arg === '--pr') {
+  if (arg === '--interactive') {
+    interactive = true
+  } else if (arg === '--pr') {
     if (i + 1 < process.argv.length) {
       prUrl = process.argv[++i]
     } else {
@@ -253,6 +256,16 @@ const platform =
 const payloadObj = { platform, workspace: process.cwd() }
 if (prUrl) {
   payloadObj.prUrl = prUrl
+}
+if (interactive) {
+  if (!process.stdin.isTTY) {
+    process.stderr.write(
+      '[CodeSentinel] --interactive requested but not running in a TTY; falling back to suggest mode.\n'
+    )
+    payloadObj.hitlMode = 'suggest'
+  } else {
+    payloadObj.hitlMode = 'interactive'
+  }
 }
 const payload = JSON.stringify(payloadObj)
 
@@ -290,16 +303,123 @@ try {
     body: payload,
   })
   const text = await res.text()
-  shutdown()
+  let parsed
   try {
-    const parsed = JSON.parse(text)
-    // Unwrap the `?wait=result` envelope ({ result, runId, ... }) to the workflow result.
-    const out =
-      parsed && typeof parsed === 'object' && 'result' in parsed ? parsed.result : parsed
-    process.stdout.write(`${JSON.stringify(out, null, 2)}\n`)
-  } catch {
-    process.stdout.write(`${text}\n`)
+    parsed = JSON.parse(text)
+  } catch {}
+  let out =
+    parsed && typeof parsed === 'object' && 'result' in parsed ? parsed.result : parsed
+
+  if (
+    out &&
+    typeof out === 'object' &&
+    out.status === 'awaiting_approval' &&
+    Array.isArray(out.patches)
+  ) {
+    const readline = await import('node:readline/promises')
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    })
+    const { execSync } = await import('node:child_process')
+    const fs = await import('node:fs/promises')
+
+    let currentOut = out
+    while (
+      currentOut &&
+      typeof currentOut === 'object' &&
+      currentOut.status === 'awaiting_approval' &&
+      Array.isArray(currentOut.patches)
+    ) {
+      if (currentOut.error) {
+        process.stdout.write(`\n\x1b[31m${currentOut.error}\x1b[0m\n`)
+      }
+
+      const decisions = {}
+      for (const patch of currentOut.patches) {
+        process.stdout.write(
+          `\n\x1b[1mPatch ${patch.id}\x1b[0m (${patch.file}) [+${patch.stats?.added ?? 0} -${patch.stats?.removed ?? 0}]:\n`
+        )
+        for (const line of patch.diff.split('\n')) {
+          if (line.startsWith('+') && !line.startsWith('+++')) {
+            process.stdout.write(`\x1b[32m${line}\x1b[0m\n`)
+          } else if (line.startsWith('-') && !line.startsWith('---')) {
+            process.stdout.write(`\x1b[31m${line}\x1b[0m\n`)
+          } else if (line.startsWith('@@')) {
+            process.stdout.write(`\x1b[36m${line}\x1b[0m\n`)
+          } else {
+            process.stdout.write(`${line}\n`)
+          }
+        }
+
+        let answered = false
+        while (!answered) {
+          const answer = (await rl.question('\n[a]pply / [r]eject / [e]dit / [q]uit: '))
+            .trim()
+            .toLowerCase()
+          if (answer === 'a' || answer === 'apply') {
+            decisions[patch.id] = 'approve'
+            answered = true
+          } else if (answer === 'r' || answer === 'reject') {
+            decisions[patch.id] = 'reject'
+            answered = true
+          } else if (answer === 'e' || answer === 'edit') {
+            const editor =
+              process.env.EDITOR || (process.platform === 'win32' ? 'notepad' : 'vi')
+            const patchPath = join(
+              process.cwd(),
+              '.CodeSentinel',
+              'patches',
+              `${patch.id}.patch`
+            )
+            try {
+              execSync(`${editor} "${patchPath}"`, { stdio: 'inherit' })
+              const editedDiff = await fs.readFile(patchPath, 'utf8')
+              decisions[patch.id] = { edit: editedDiff }
+              answered = true
+            } catch (editErr) {
+              process.stderr.write(
+                `Failed to open editor: ${editErr instanceof Error ? editErr.message : String(editErr)}\n`
+              )
+            }
+          } else if (answer === 'q' || answer === 'quit') {
+            rl.close()
+            shutdown()
+            process.exit(0)
+          } else {
+            process.stdout.write('Please enter a, r, e, or q.\n')
+          }
+        }
+      }
+
+      const resumeRes = await fetch(`${base}/workflows/${workflow}?wait=result`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          resume: {
+            threadId: currentOut.threadId,
+            decisions,
+          },
+        }),
+      })
+      const resumeText = await resumeRes.text()
+      try {
+        const resumeParsed = JSON.parse(resumeText)
+        currentOut =
+          resumeParsed && typeof resumeParsed === 'object' && 'result' in resumeParsed
+            ? resumeParsed.result
+            : resumeParsed
+      } catch {
+        currentOut = null
+      }
+    }
+
+    rl.close()
+    out = currentOut
   }
+
+  shutdown()
+  process.stdout.write(`${JSON.stringify(out, null, 2)}\n`)
   process.exit(res.ok ? 0 : 1)
 } catch (error) {
   shutdown()

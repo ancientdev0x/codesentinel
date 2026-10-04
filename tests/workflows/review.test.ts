@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getOrCreateCollector } from '../../src/graph/collector'
 
 // Mock only the collaborators that touch git or GitHub. `filterFiles` and
 // `resolveReviewConfig` are exercised for real (the latter reads process.env).
@@ -9,7 +10,7 @@ vi.mock('../../src/review/diff', async (orig) => ({
 }))
 
 const postSummary = vi.fn().mockResolvedValue('http://s')
-const postReviewComment = vi.fn()
+const postReviewComment = vi.fn().mockResolvedValue('http://c')
 const createReporter = vi.fn(() => ({ postSummary, postReviewComment }))
 vi.mock('../../src/github/reporter', () => ({
   createReporter: (...args: unknown[]) => createReporter(...args),
@@ -70,6 +71,9 @@ describe('review workflow run()', () => {
     vi.clearAllMocks()
     vi.unstubAllGlobals()
     vi.unstubAllEnvs()
+    delete process.env.CodeSentinel_PR_URL
+    delete process.env.CODESENTINEL_PR_URL
+    delete process.env.CodeSentinel_INPUT_PLATFORM
   })
 
   it('returns early without driving the agent when no files changed', async () => {
@@ -301,5 +305,83 @@ describe('review workflow run()', () => {
         durationMs: 400,
       },
     ])
+  })
+
+  it('returns awaiting_approval when hitlMode is interactive, and completes on resume', async () => {
+    const { execSync } = await import('node:child_process')
+    const { promises: fsp } = await import('node:fs')
+    const osp = await import('node:os')
+    const pathp = await import('node:path')
+
+    const tmpRepo = await fsp.mkdtemp(pathp.join(osp.tmpdir(), 'hitl-wf-repo-'))
+    execSync('git init', { cwd: tmpRepo })
+    execSync('git config user.name "Test User"', { cwd: tmpRepo })
+    execSync('git config user.email "test@example.com"', { cwd: tmpRepo })
+    await fsp.writeFile(pathp.join(tmpRepo, 'src.ts'), 'export const a = 1\n')
+    execSync('git add . && git commit -m "initial"', { cwd: tmpRepo })
+
+    try {
+      const file = {
+        fileName: 'src.ts',
+        fileContent: 'export const a = 1\n',
+        changedLines: [{ start: 1, end: 1 }],
+        diff: 'diff --git a/src.ts b/src.ts\n@@ -1,1 +1,1 @@\n-export const a = 1\n+export const a = 2\n',
+        status: 'modified' as const,
+        additions: 1,
+        deletions: 1,
+      }
+      getChangedFiles.mockResolvedValue({
+        files: [file],
+        rawDiff: file.diff,
+      })
+
+      const { harness, session } = makeHarness('Done')
+      session.prompt.mockImplementation(async () => {
+        const runId = process.env.CodeSentinel_RUN_ID!
+        const collector = getOrCreateCollector(runId)
+        collector.recordFinding({
+          file: 'src.ts',
+          startLine: 1,
+          endLine: 1,
+          severity: 'medium',
+          message: 'fix this',
+          fix: {
+            replacement: 'export const a = 2',
+            startLine: 1,
+            endLine: 1,
+          },
+        })
+        return { text: 'Done' }
+      })
+
+      // 1. Initial workflow run with interactive hitlMode
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const step1Result: any = await runWorkflow(harness, {
+        platform: 'local',
+        hitlMode: 'interactive',
+        workspace: tmpRepo,
+      })
+      expect(step1Result.status).toBe('awaiting_approval')
+      expect(step1Result.threadId).toBeDefined()
+      expect(step1Result.patches).toHaveLength(1)
+      const patchId = step1Result.patches[0].id
+
+      // 2. Resume workflow
+      const step2Result: any = await runWorkflow(harness, {
+        resume: {
+          threadId: step1Result.threadId,
+          decisions: { [patchId]: 'approve' },
+        },
+      })
+
+      expect(step2Result.status).toBe('completed')
+      expect(step2Result.applied).toContain(patchId)
+
+      const appliedContent = await fsp.readFile(pathp.join(tmpRepo, 'src.ts'), 'utf8')
+      expect(appliedContent).toBe('export const a = 2\n')
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+    } finally {
+      await fsp.rm(tmpRepo, { recursive: true, force: true }).catch(() => {})
+    }
   })
 })

@@ -82,6 +82,8 @@ export const buildReviewGraph = (deps: ReviewGraphDeps = {}) => {
     .addEdge('human_review', 'report')
     .addEdge('report', END)
 
-  const checkpointer = deps.checkpointer ?? new MemorySaver()
+  const checkpointer = deps.checkpointer ?? defaultMemorySaver
   return workflow.compile({ checkpointer })
 }
+
+export const defaultMemorySaver = new MemorySaver()
