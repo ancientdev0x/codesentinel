@@ -270,4 +270,47 @@ describe('createReporter fallback', () => {
 
     errSpy.mockRestore()
   })
+
+  it('switches to local reporter on 403 and directs subsequent comments locally', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const cfg = baseGithubConfig(dir)
+    const reporter = createReporter(cfg)
+
+    const forbiddenError = new Error('Resource not accessible by integration')
+    Object.assign(forbiddenError, { status: 403 })
+    mockClient.rest.pulls.createReviewComment.mockRejectedValueOnce(forbiddenError)
+
+    const firstUrl = await reporter.postReviewComment({
+      filePath: 'src/a.ts',
+      comment: 'first inline comment',
+      startLine: 1,
+      endLine: 1,
+    })
+    expect(firstUrl).toContain('.CodeSentinel')
+    expect(mockClient.rest.pulls.createReviewComment).toHaveBeenCalledTimes(1)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'))
+
+    const secondUrl = await reporter.postReviewComment({
+      filePath: 'src/b.ts',
+      comment: 'second inline comment',
+      startLine: 5,
+      endLine: 5,
+    })
+    expect(secondUrl).toContain('.CodeSentinel')
+    expect(mockClient.rest.pulls.createReviewComment).toHaveBeenCalledTimes(1)
+
+    const summaryUrl = await reporter.postSummary('summary of review')
+    expect(summaryUrl).toContain('.CodeSentinel')
+    expect(mockClient.rest.issues.createComment).not.toHaveBeenCalled()
+
+    const reviewDir = join(dir, '.CodeSentinel', 'review')
+    const files = (await readdir(reviewDir)).filter((f) => f.endsWith('.md'))
+    expect(files.length).toBe(1)
+    const content = await readFile(join(reviewDir, files[0]), 'utf8')
+    expect(content).toContain('first inline comment')
+    expect(content).toContain('second inline comment')
+    expect(content).toContain('summary of review')
+
+    warnSpy.mockRestore()
+  })
 })

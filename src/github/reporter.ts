@@ -126,6 +126,68 @@ const createLocalReporter = (cfg: ReviewConfig): Reporter => {
   }
 }
 
+/**
+ * Wraps a primary reporter with a fallback reporter. If the primary throws an HTTP 403 Forbidden
+ * (e.g. read-only token), it logs a warning once and switches all future operations to the fallback.
+ */
+export const fallbackOnForbidden = (primary: Reporter, fallback: Reporter): Reporter => {
+  let switched = false
+
+  const isForbidden = (err: unknown): boolean => {
+    if (!err) return false
+    const msg = String(err)
+    if (
+      msg.includes('403') ||
+      msg.includes('Forbidden') ||
+      msg.includes('Resource not accessible')
+    ) {
+      return true
+    }
+    if (typeof err === 'object' && err !== null) {
+      if ('status' in err && (err as { status: number }).status === 403) return true
+      if ('cause' in err && isForbidden((err as { cause: unknown }).cause)) return true
+    }
+    return false
+  }
+
+  return {
+    postReviewComment: async (input) => {
+      if (switched) {
+        return fallback.postReviewComment(input)
+      }
+      try {
+        return await primary.postReviewComment(input)
+      } catch (err) {
+        if (isForbidden(err)) {
+          switched = true
+          console.warn(
+            '[CodeSentinel] GITHUB_TOKEN does not have write access to post review comments (HTTP 403). Falling back to local file output.'
+          )
+          return fallback.postReviewComment(input)
+        }
+        throw err
+      }
+    },
+    postSummary: async (comment) => {
+      if (switched) {
+        return fallback.postSummary(comment)
+      }
+      try {
+        return await primary.postSummary(comment)
+      } catch (err) {
+        if (isForbidden(err)) {
+          switched = true
+          console.warn(
+            '[CodeSentinel] GITHUB_TOKEN does not have write access to post summary (HTTP 403). Falling back to local file output.'
+          )
+          return fallback.postSummary(comment)
+        }
+        throw err
+      }
+    },
+  }
+}
+
 export const createReporter = (cfg: ReviewConfig): Reporter => {
   // On the github platform without PR context (owner/repo/prNumber), degrade to
   // local file output with a visible warning rather than crashing the review.
@@ -136,5 +198,10 @@ export const createReporter = (cfg: ReviewConfig): Reporter => {
     )
     return createLocalReporter(cfg)
   }
-  return cfg.platform === 'github' ? createGithubReporter(cfg) : createLocalReporter(cfg)
+  if (cfg.platform === 'github') {
+    const github = createGithubReporter(cfg)
+    const local = createLocalReporter(cfg)
+    return fallbackOnForbidden(github, local)
+  }
+  return createLocalReporter(cfg)
 }
