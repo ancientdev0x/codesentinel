@@ -18,7 +18,7 @@ Design choice: **fetch the refs, don't just download the `.diff`**. The AST stag
 
 ---
 
-## E1.1 `parsePrUrl`
+## E1.1 `parsePrUrl` [x]
 **File:** `src/review/source.ts` (new)
 ```ts
 export interface PrRef { host: string; owner: string; repo: string; number: number }

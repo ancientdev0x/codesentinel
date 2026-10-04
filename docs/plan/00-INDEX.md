@@ -48,7 +48,7 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E0.5 Add test fixtures: `tests/fixtures/vuln-repo/` (seeded Python + TS vulns, a git repo built at test time)
   - [x] E0.6 Get approval for the dependency list below (AGENTS.md rule)
 - [ ] **E1 PR URL ingestion** (C1): [`E1-pr-url-ingestion.md`](E1-pr-url-ingestion.md) *(~1d)*
-  - [ ] E1.1 `parsePrUrl()` + tests
+  - [x] E1.1 `parsePrUrl()` + tests
   - [ ] E1.2 `src/review/source.ts`: fetch PR meta, shallow-fetch head/base into a temp worktree
   - [ ] E1.3 CLI `CodeSentinel review --pr <url>` and payload `prUrl`
   - [ ] E1.4 Make the reporter target the URL's PR (post comments there when a token is available)
