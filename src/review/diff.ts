@@ -10,6 +10,7 @@ const execFileAsync = promisify(execFile)
 /** A changed file plus the raw unified diff for that file. */
 export interface ReviewFileWithDiff extends ReviewFile {
   diff: string
+  isPureDeletion?: boolean
 }
 
 /** Parsed changed file (no content) — what {@link parseDiff} returns. */
