@@ -83,3 +83,8 @@ E1.1–E1.4 are ticked, and the manual run against a public PR is recorded in th
 - `tests/workflows/review.test.ts`: 9/9 tests pass covering PR materialization from `prUrl`, overriding workspace/shas/github target, worktree cleanup in `finally` on error or success, and capping at 300 files.
 - `tests/github/reporter.test.ts`: 10/10 tests pass covering fallback on HTTP 403 Forbidden to local reporter, ensuring subsequent comments and summary land in the local report file without throwing or re-calling GitHub API.
 - All 159 tests passing in vitest suite; `npm run check && npm run check:types && npm test && npm run build` pass with 0 errors.
+
+### Manual CLI verification on public PR
+- Command: `node bin/CodeSentinel.mjs review --pr https://github.com/noctalia-dev/noctalia/pull/4694`
+- Tested against public repo `noctalia-dev/noctalia` PR `#4694` (+1 -22, `application_services.cpp`).
+- Successfully parsed PR URL into `{ host: 'github.com', owner: 'noctalia-dev', repo: 'noctalia', number: 4694 }`, fetched PR metadata via Octokit, created isolated temp worktree, fetched refs (`refs/pull/4694/head`), checked out detached `head.sha`, parsed git diff, and handed off to workflow. Worktree directory cleaned up cleanly in `finally`. Full LLM completion proceeds as soon as an LLM provider key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.) is supplied.
