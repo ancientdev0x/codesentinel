@@ -47,11 +47,11 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E0.4 Add feature flags in config + `action.yml` inputs (`STATIC_ANALYSIS`, `SANDBOX`, `AST_CHECKS`, `HITL_MODE`, `LANGFUSE_*`)
   - [x] E0.5 Add test fixtures: `tests/fixtures/vuln-repo/` (seeded Python + TS vulns, a git repo built at test time)
   - [x] E0.6 Get approval for the dependency list below (AGENTS.md rule)
-- [ ] **E1 PR URL ingestion** (C1): [`E1-pr-url-ingestion.md`](E1-pr-url-ingestion.md) *(~1d)*
+- [x] **E1 PR URL ingestion** (C1): [`E1-pr-url-ingestion.md`](E1-pr-url-ingestion.md) *(~1d)*
   - [x] E1.1 `parsePrUrl()` + tests
   - [x] E1.2 `src/review/source.ts`: fetch PR meta, shallow-fetch head/base into a temp worktree
-  - [ ] E1.3 CLI `CodeSentinel review --pr <url>` and payload `prUrl`
-  - [ ] E1.4 Make the reporter target the URL's PR (post comments there when a token is available)
+  - [x] E1.3 CLI `CodeSentinel review --pr <url>` and payload `prUrl`
+  - [x] E1.4 Make the reporter target the URL's PR (post comments there when a token is available)
 - [ ] **E2 AST fragment extraction + AST checks** (C1): [`E2-ast-extraction.md`](E2-ast-extraction.md) *(~1.5d)*
   - [ ] E2.1 `@ast-grep/napi` + Python language registration; `src/review/ast/parse.ts`
   - [ ] E2.2 `extractFragments()`: changed lines → enclosing function/class/method nodes

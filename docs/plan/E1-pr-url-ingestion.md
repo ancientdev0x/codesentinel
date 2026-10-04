@@ -54,14 +54,14 @@ Steps:
 - **Tests:** mock Octokit, and use a local bare repo as "origin" with `file://` so the test needs no network. Cover the fork-deleted fallback.
 - **Accept:** for the local bare repo, the returned workspace has `headSha` checked out and `git merge-base base head` succeeds.
 
-## E1.3 CLI + payload
+## E1.3 CLI + payload [x]
 **Files:** `bin/CodeSentinel.mjs`, `src/workflows/review.ts`, `src/review/config.ts`
 - Parse `--pr <url>` and `--pr=<url>` in the bin, and put `prUrl` in the POST payload (around `bin/CodeSentinel.mjs:233`). Update `HELP`.
 - In the workflow (or in the E4 `ingest` node, which supersedes this): if `cfg.prUrl` is set, run `materializePr` and override `cfg.workspace`, `cfg.baseSha` and `cfg.headSha`. When `GITHUB_TOKEN` is present, also set `cfg.github = {owner, repo, prNumber, token}`.
 - Keep the existing behaviour unchanged when `prUrl` is absent.
 - **Accept:** `node bin/CodeSentinel.mjs review --pr <public PR url>` with no token writes a local report about that PR's files. Verify manually on a small public PR and paste the output path.
 
-## E1.4 Reporter targeting
+## E1.4 Reporter targeting [x]
 **Files:** `src/github/reporter.ts`, `src/review/config.ts`
 - `createGithubReporter` already uses `cfg.github` plus `cfg.headSha` (`resolveCommitId`). Make sure E1.3 fills both.
 - When the token can't write to the target repo (403 on the first post), stop throwing on every comment: switch once to the local reporter and log a single warning. A `fallbackOnForbidden` wrapper around the reporter is enough.
@@ -75,3 +75,11 @@ Steps:
 
 ## Done when
 E1.1–E1.4 are ticked, and the manual run against a public PR is recorded in this file under `## Verification`.
+
+## Verification
+
+### Automated tests
+- `tests/review/source.test.ts`: 10/10 tests pass covering `parsePrUrl` (URL formats, short forms, rejects invalid chars/hosts/numbers) and `materializePr` (mock Octokit, git clone/checkout against local bare repo, merge-base verification, cleanup).
+- `tests/workflows/review.test.ts`: 9/9 tests pass covering PR materialization from `prUrl`, overriding workspace/shas/github target, worktree cleanup in `finally` on error or success, and capping at 300 files.
+- `tests/github/reporter.test.ts`: 10/10 tests pass covering fallback on HTTP 403 Forbidden to local reporter, ensuring subsequent comments and summary land in the local report file without throwing or re-calling GitHub API.
+- All 159 tests passing in vitest suite; `npm run check && npm run check:types && npm test && npm run build` pass with 0 errors.
