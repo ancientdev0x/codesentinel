@@ -8,6 +8,8 @@ import {
   type ReviewPayload,
   resolveReviewConfig,
 } from '../review/config'
+import { runAstChecks } from '../review/ast/checks'
+import { extractAllFragments } from '../review/ast/fragments'
 import { buildReviewPrompt } from '../review/context'
 import { type ReviewFileWithDiff, getChangedFiles } from '../review/diff'
 import { materializePr, parsePrUrl } from '../review/source'
@@ -121,7 +123,17 @@ export default defineWorkflow({
 
       const session = await harness.session()
 
-      const prompt = buildReviewPrompt(filtered, cfg.workspace)
+      const fragments = cfg.astChecks ? extractAllFragments(filtered) : []
+      const findings = cfg.astChecks ? runAstChecks(filtered) : []
+      const prompt = buildReviewPrompt(
+        {
+          files: filtered,
+          fragments,
+          findings,
+          astChecks: cfg.astChecks,
+        },
+        cfg.workspace
+      )
       // Use the agent's final message as the summary rather than a structured
       // `result` schema: response_format/json_schema is not supported by every
       // provider (e.g. Cloudflare Workers AI returns 400), and a free-text final

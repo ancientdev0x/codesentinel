@@ -1,7 +1,7 @@
 import type { SgNode } from '@ast-grep/napi'
 import type { LineRange } from '../../common/types'
 import type { ReviewFileWithDiff } from '../diff'
-import { type AstLang, nodeLineSpan, parseFile, to0BasedLine } from './parse'
+import { type AstLang, langFor, nodeLineSpan, parseFile, to0BasedLine } from './parse'
 
 export interface CodeFragment {
   file: string
@@ -232,4 +232,14 @@ export const extractFragments = (
 
   // Sort fragments by startLine in ascending order
   return Array.from(fragmentsByNodeId.values()).sort((a, b) => a.startLine - b.startLine)
+}
+
+/**
+ * Extracts fragments for all changed files whose language is supported.
+ */
+export const extractAllFragments = (files: ReviewFileWithDiff[]): CodeFragment[] => {
+  return files.flatMap((f) => {
+    const lang = langFor(f.fileName)
+    return lang ? extractFragments(f, lang) : []
+  })
 }

@@ -1,0 +1,35 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildReviewPrompt > emits AST fragments for .py and .ts and hunks for .md 1`] = `
+"Files changed for this review (paths relative to root, includes line ranges):
+├── app
+│   └── calc.py: 2
+├── docs
+│   └── guide.md: 3
+└── src
+    └── service.ts: 2
+---
+
+Below are the diffs for the files changed in this pull request. Review them, investigate the
+surrounding code with your tools, and post inline comments on real problems with \`suggest_change\`.
+
+### app/calc.py › evaluate (L1–L2, changed: 2)
+\`\`\`python
+def evaluate(expr):
+    return eval(expr)
+\`\`\`
+
+### src/service.ts › run (L1–L3, changed: 2)
+\`\`\`typescript
+function run(cmd: string) {
+  return eval(cmd)
+}
+\`\`\`
+
+### docs/guide.md
+\`\`\`diff
+diff --git a/docs/guide.md b/docs/guide.md
+@@ -3 +3 @@
++Updated documentation.
+\`\`\`"
+`;
