@@ -1,5 +1,20 @@
 import { propagateAttributes, startActiveObservation } from '@langfuse/tracing'
 import { trace } from '@opentelemetry/api'
+import * as v from 'valibot'
+
+export const TraceMetadataSchema = v.object({
+  repo: v.string(),
+  pr: v.union([v.number(), v.string()]),
+  runId: v.string(),
+  model: v.string(),
+  platform: v.picklist(['github', 'local']),
+})
+
+export type TraceMetadata = v.InferOutput<typeof TraceMetadataSchema>
+
+export const validateTraceMetadata = (data: unknown): TraceMetadata => {
+  return v.parse(TraceMetadataSchema, data)
+}
 
 export interface TraceMetadataInput {
   name?: string

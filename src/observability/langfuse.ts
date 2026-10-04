@@ -99,10 +99,18 @@ export const initTracing = (env: NodeJS.ProcessEnv = process.env): boolean => {
   return true
 }
 
+export const tracingLifecycle = {
+  flushCount: 0,
+  reset() {
+    this.flushCount = 0
+  },
+}
+
 /**
  * Flushes active spans to Langfuse.
  */
 export const flushTracing = async (): Promise<void> => {
+  tracingLifecycle.flushCount++
   if (processor) {
     await processor.forceFlush()
   }
