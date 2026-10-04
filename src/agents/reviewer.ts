@@ -6,12 +6,14 @@ import { resolveReviewConfig } from '../review/config'
 import { buildInstructions } from '../review/instructions'
 import { traceTools } from '../observability/tools'
 import { createRunStaticAnalysisTool } from '../tools/run-static-analysis'
+import { createRecordFindingTool } from '../tools/record-finding'
+import { createTriageFindingTool } from '../tools/triage-finding'
 import { createSuggestChangeTool } from '../tools/suggest-change'
 
 /**
  * The CodeSentinel code-review agent. Runs in a `local()` sandbox over the repo
  * checkout, with the built-in pi tools (`read`/`grep`/`glob`/`bash`/`task`) plus
- * the `suggest_change` tool for posting inline review comments.
+ * the `record_finding`, `triage_finding`, and `run_static_analysis` tools.
  *
  * The initializer re-runs on every harness init. In flue beta.9 the agent
  * initializer receives only `{ id, env }` (no per-invocation payload), so the run
@@ -34,8 +36,10 @@ export default createAgent(async ({ env }) => {
     cwd: cfg.workspace,
     instructions: await buildInstructions(cfg),
     tools: traceTools([
-      createSuggestChangeTool(reporter),
+      createRecordFindingTool(),
+      createTriageFindingTool(),
       createRunStaticAnalysisTool(cfg),
+      createSuggestChangeTool(reporter),
       ...mcp.tools,
     ]),
   }
