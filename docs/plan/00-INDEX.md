@@ -58,14 +58,14 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E2.3 Rule packs `src/review/ast/rules/{python,typescript}.yml` (sinks: eval/exec/shell/pickle/SQL concat/…)
   - [x] E2.4 `runAstChecks()` → `Finding[]` restricted to changed lines
   - [x] E2.5 Feed fragments (not raw `-U0` hunks) into the prompt
-- [ ] **E3 Sandboxed static analysis: Bandit + Ruff** (C2): [`E3-static-analysis-sandbox.md`](E3-static-analysis-sandbox.md) *(~2d)*
-  - [ ] E3.1 `src/sandbox/run.ts`: `runIsolated()` with execFile, timeout, SIGKILL, maxBuffer, typed result
-  - [ ] E3.2 Docker backend (`--network none --read-only --cap-drop ALL …`) + `docker/analyzers.Dockerfile`
-  - [ ] E3.3 Bandit adapter (JSON → `Finding`)
-  - [ ] E3.4 Ruff adapter (`--select S,B,E9,F` JSON → `Finding`)
-  - [ ] E3.5 Regression signals: Ruff F/E9 (undefined names, syntax errors) + `tsc --noEmit` / oxlint on TS changes
-  - [ ] E3.6 `run_static_analysis` flue tool (agent can re-run on demand)
-  - [ ] E3.7 Action wiring (install analyzers / build image) + summary section
+- [x] **E3 Sandboxed static analysis: Bandit + Ruff** (C2): [`E3-static-analysis-sandbox.md`](E3-static-analysis-sandbox.md) *(~2d)*
+  - [x] E3.1 `src/sandbox/run.ts`: `runIsolated()` with execFile, timeout, SIGKILL, maxBuffer, typed result
+  - [x] E3.2 Docker backend (`--network none --read-only --cap-drop ALL …`) + `docker/analyzers.Dockerfile`
+  - [x] E3.3 Bandit adapter (JSON → `Finding`)
+  - [x] E3.4 Ruff adapter (`--select S,B,E9,F` JSON → `Finding`)
+  - [x] E3.5 Regression signals: Ruff F/E9 (undefined names, syntax errors) + `tsc --noEmit` / oxlint on TS changes
+  - [x] E3.6 `run_static_analysis` flue tool (agent can re-run on demand)
+  - [x] E3.7 Action wiring (install analyzers / build image) + summary section
 - [ ] **E4 LangGraph cyclic state engine** (C3): [`E4-langgraph-engine.md`](E4-langgraph-engine.md) *(~2.5d, after E1–E3)*
   - [ ] E4.1 State schema (`src/graph/state.ts`)
   - [ ] E4.2 Nodes: ingest, extract_ast, static_analysis, llm_triage, validate, failure_analysis, report

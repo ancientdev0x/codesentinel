@@ -130,3 +130,55 @@ docker run --rm --name cs-<tool>-<rand>
 
 ## Done when
 E3.1–E3.7 are ticked. On the E0.5 fixtures, `runStaticAnalysis` finds every Python row in the fixture table (Bandit and Ruff) plus the tsc error, and the timeout test passes.
+
+## Deviations
+1. **Ruff CWE Mapping for Deduplication**: Ruff's JSON output does not provide CWE numbers natively, whereas Bandit outputs `issue_cwe.id`. An `S_RULE_CWE` mapping table was added in `src/review/analyzers/ruff.ts` (e.g. S602 -> CWE-78) to allow `dedupeFindings` to deduplicate overlapping Bandit and Ruff findings accurately.
+2. **Host Isolation for TypeScript**: TypeScript type checking (`tsc --noEmit`) runs on the host via `runIsolated(spec, 'host')` with timeout and process isolation because `tsc` requires `tsconfig.json` and the repository's installed `node_modules` (not baked into the Python container).
+3. **Container Reaping**: In addition to killing the docker client process on timeout, `docker kill <containerName>` is explicitly executed in `docker.ts` to ensure container processes are not orphaned if the client process disconnects.
+
+## Verification
+
+### 1. Test suite execution
+```bash
+npm run check && npm run check:types && npm test
+```
+Trimmed output:
+```
+> oxlint && oxfmt --check
+Found 0 warnings and 0 errors.
+All matched files use the correct format.
+
+> tsc --noEmit
+(zero errors)
+
+Test Files  38 passed | 2 skipped (40)
+     Tests  226 passed | 3 skipped (229)
+✓ tests/sandbox/run.test.ts (4 tests)
+✓ tests/sandbox/docker.test.ts (3 tests)
+  ✓ Docker sandbox (E3.2) > integration: network access is strictly blocked inside container
+  ✓ Docker sandbox (E3.2) > integration: long-running container is killed on timeout
+✓ tests/review/analyzers/bandit.test.ts (3 tests)
+  ✓ Bandit adapter (E3.3) > integration: runs bandit inside docker against fixture files
+✓ tests/review/analyzers/ruff.test.ts (3 tests)
+  ✓ Ruff adapter (E3.4) > integration: runs ruff inside docker against fixture files
+✓ tests/review/analyzers/typescript.test.ts (3 tests)
+  ✓ TypeScript analyzer adapter (E3.5) > runs tsc against fixture workspace and detects broken.ts regression
+✓ tests/tools/run-static-analysis.test.ts (2 tests)
+  ✓ run_static_analysis tool (E3.6) > runs analysis on valid files within workspace and returns JSON findings
+✓ tests/common/formatting/summary.test.ts (4 tests)
+✓ tests/review/analyzers/run-static-analysis.test.ts (1 test)
+  ✓ runStaticAnalysis end-to-end against E0.5 fixture repo > finds bandit and ruff vulnerabilities and tsc error on fixture workspace
+✓ tests/workflows/review.test.ts (10 tests)
+```
+
+### 2. Build verification
+```bash
+npm run build
+```
+Trimmed output:
+```
+> flue build --target node
+done built dist/server.mjs
+done ready dist
+```
+
