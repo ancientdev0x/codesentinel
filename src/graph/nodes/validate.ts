@@ -1,5 +1,6 @@
 import * as v from 'valibot'
 import { FindingSchema, type Finding } from '../../review/findings'
+import { buildPatch, type Patch } from '../../review/patch'
 import type { ReviewStateType, ReviewStateUpdate, StageError } from '../state'
 
 export const validateFindingIntersectsDiff = (
@@ -11,7 +12,13 @@ export const validateFindingIntersectsDiff = (
   )
 }
 
-export const validate = () => {
+export interface ValidateDeps {
+  buildPatch?: (workspace: string, f: Finding) => Promise<Patch>
+}
+
+export const validate = (deps?: ValidateDeps) => {
+  const doBuildPatch = deps?.buildPatch ?? buildPatch
+
   return async (state: ReviewStateType): Promise<ReviewStateUpdate> => {
     const attempts = {
       ...state.attempts,
@@ -65,6 +72,20 @@ export const validate = () => {
             detail: `Finding fix line range ${finding.fix.startLine}..${finding.fix.endLine} is invalid`,
           })
           continue
+        }
+
+        if (state.cfg?.workspace) {
+          try {
+            await doBuildPatch(state.cfg.workspace, finding)
+          } catch (patchErr: unknown) {
+            errors.push({
+              stage: 'validate',
+              kind: 'bad_patch',
+              findingId: finding.id,
+              detail: patchErr instanceof Error ? patchErr.message : String(patchErr),
+            })
+            continue
+          }
         }
       }
 
