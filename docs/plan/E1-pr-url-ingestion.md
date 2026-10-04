@@ -32,7 +32,7 @@ export const parsePrUrl = (url: string): PrRef => {
 - **Tests:** valid forms, the `/files` suffix, the short form, and rejection of `../`, spaces, non-github hosts (unless `GITHUB_API_URL` is set, for GHES support), and `number<=0`.
 - **Accept:** tests pass.
 
-## E1.2 Materialize the PR on disk
+## E1.2 Materialize the PR on disk [x]
 **File:** `src/review/source.ts`
 ```ts
 export interface MaterializedPr { workspace: string; baseSha: string; headSha: string; ref: PrRef; cleanup(): Promise<void> }
