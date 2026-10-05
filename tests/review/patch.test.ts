@@ -381,4 +381,106 @@ describe('E5.1 buildPatch', () => {
     expect(c1).toBe('approved 1\n')
     expect(c2).toBe('original 2\n')
   })
+
+  it('rejects patch with invalid_syntax if replacement introduces TypeScript syntax errors', async () => {
+    const filePath = 'src/broken.ts'
+    const fullPath = path.join(tmpRepo, filePath)
+    await fs.mkdir(path.dirname(fullPath), { recursive: true })
+    await fs.writeFile(fullPath, 'const validNumber = 42\n', 'utf8')
+    execSync('git add . && git commit -m "initial"', { cwd: tmpRepo })
+
+    const finding: Finding = {
+      id: 'f-bad-syntax',
+      source: 'llm',
+      ruleId: 'r-ts',
+      severity: 'high',
+      file: filePath,
+      startLine: 1,
+      endLine: 1,
+      message: 'broken syntax',
+      status: 'confirmed',
+      fix: {
+        replacement: 'const validNumber: number = ;',
+        startLine: 1,
+        endLine: 1,
+      },
+    }
+
+    await expect(buildPatch(tmpRepo, finding)).rejects.toSatisfy((err: unknown) => {
+      return (
+        err instanceof PatchError &&
+        err.kind === 'invalid_syntax' &&
+        err.message.includes('syntax errors')
+      )
+    })
+  })
+
+  it('handles auth_logic case: expands to enclosing statement to produce valid python that compiles', async () => {
+    const filePath = 'app/auth_logic.py'
+    const fullPath = path.join(tmpRepo, filePath)
+    await fs.mkdir(path.dirname(fullPath), { recursive: true })
+    const originalContent =
+      'def authorize_action(user, action):\n    if not user.is_admin:\n        return True\n    return action in user.permissions\n'
+    await fs.writeFile(fullPath, originalContent, 'utf8')
+    execSync('git add . && git commit -m "initial"', { cwd: tmpRepo })
+
+    // Finding targets line 2 only, but statement expansion expands to 2..3 so line 3 orphan indent is not left
+    const finding: Finding = {
+      id: 'f-auth',
+      source: 'llm',
+      ruleId: 'r-auth',
+      severity: 'critical',
+      file: filePath,
+      startLine: 2,
+      endLine: 2,
+      message: 'Remove admin bypass',
+      status: 'confirmed',
+      fix: {
+        replacement: '    return action in user.permissions',
+        startLine: 2,
+        endLine: 2,
+      },
+    }
+
+    const patch = await buildPatch(tmpRepo, finding)
+    expect(patch.file).toBe(filePath)
+    await applyPatch(tmpRepo, patch)
+
+    const updated = await fs.readFile(fullPath, 'utf8')
+    expect(updated).not.toContain('        return True')
+
+    // Verify it compiles cleanly with python3 -m py_compile
+    expect(() => {
+      execSync(`python3 -m py_compile "${fullPath}"`)
+    }).not.toThrow()
+  })
+
+  it('rejects patch when invalid python syntax cannot be repaired by statement expansion', async () => {
+    const filePath = 'app/invalid.py'
+    const fullPath = path.join(tmpRepo, filePath)
+    await fs.mkdir(path.dirname(fullPath), { recursive: true })
+    await fs.writeFile(fullPath, 'def compute():\n    return 42\n', 'utf8')
+    execSync('git add . && git commit -m "initial"', { cwd: tmpRepo })
+
+    const finding: Finding = {
+      id: 'f-bad-py',
+      source: 'llm',
+      ruleId: 'r-py',
+      severity: 'high',
+      file: filePath,
+      startLine: 2,
+      endLine: 2,
+      message: 'broken py',
+      status: 'confirmed',
+      fix: {
+        replacement: '    return (42 +',
+        startLine: 2,
+        endLine: 2,
+      },
+    }
+
+    await expect(buildPatch(tmpRepo, finding)).rejects.toSatisfy((err: unknown) => {
+      return err instanceof PatchError && err.kind === 'invalid_syntax'
+    })
+  })
 })

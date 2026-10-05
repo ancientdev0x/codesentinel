@@ -14,6 +14,7 @@ import type { ReviewStateType } from '../../src/graph/state'
 import { resolveReviewConfig } from '../../src/review/config'
 import type { Finding } from '../../src/review/findings'
 import { recordRejectedPatch } from '../../src/review/patch-commands'
+import { PatchError } from '../../src/review/patch'
 
 describe('ReviewGraph nodes (E4.2)', () => {
   const baseCfg = resolveReviewConfig({ platform: 'local', workspace: process.cwd() }, {})
@@ -127,6 +128,44 @@ describe('ReviewGraph nodes (E4.2)', () => {
     expect(update.errors?.some((e) => e.kind === 'invalid_output')).toBe(true)
   })
 
+  it('validate node keeps finding and strips fix when buildPatch fails with invalid_syntax', async () => {
+    const node = validate({
+      buildPatch: async () => {
+        throw new PatchError('Invalid syntax introduced', 'invalid_syntax')
+      },
+    })
+
+    const findingWithBadFix: Finding = {
+      id: 'f-syntax',
+      source: 'llm',
+      ruleId: 'sql-injection',
+      severity: 'high',
+      file: 'src/main.ts',
+      startLine: 1,
+      endLine: 1,
+      message: 'SQL Injection on line 1',
+      status: 'confirmed',
+      fix: {
+        replacement: 'const x = ;',
+        startLine: 1,
+        endLine: 1,
+      },
+    }
+
+    const update = await node({
+      ...baseState,
+      cfg: baseCfg,
+      llmFindings: [findingWithBadFix],
+      staticFindings: [],
+    })
+
+    // Finding kept in llmFindings, but fix stripped, and no bad_patch error logged
+    expect(update.llmFindings).toHaveLength(1)
+    expect(update.llmFindings?.[0].id).toBe('f-syntax')
+    expect(update.llmFindings?.[0].fix).toBeUndefined()
+    expect(update.errors?.some((e) => e.kind === 'bad_patch')).toBe(false)
+  })
+
   it('human_review is a pass-through node incrementing attempts', async () => {
     const node = humanReview()
     const update = await node(baseState)
@@ -160,6 +199,164 @@ describe('ReviewGraph nodes (E4.2)', () => {
     expect(postReviewComment).toHaveBeenCalled()
     expect(postSummary).toHaveBeenCalled()
     expect(update.attempts?.report).toBe(1)
+  })
+
+  it('report node groups multiple findings on the same line into one comment', async () => {
+    const postReviewComment = vi.fn().mockResolvedValue('url')
+    const postSummary = vi.fn().mockResolvedValue('url')
+    const node = report({
+      createReporter: () => ({ postReviewComment, postSummary }) as any,
+    })
+
+    await node({
+      ...baseState,
+      staticFindings: [
+        {
+          id: 'f-bandit',
+          source: 'bandit',
+          ruleId: 'B501',
+          severity: 'high',
+          file: 'calc.py',
+          startLine: 2,
+          endLine: 2,
+          message: 'Insecure eval sink',
+          status: 'confirmed',
+        },
+        {
+          id: 'f-ruff',
+          source: 'ruff',
+          ruleId: 'S501',
+          severity: 'high',
+          file: 'calc.py',
+          startLine: 2,
+          endLine: 2,
+          message: 'Possible code execution via eval',
+          status: 'confirmed',
+        },
+      ],
+      llmFindings: [
+        {
+          id: 'f-llm',
+          source: 'llm',
+          ruleId: 'py-eval',
+          severity: 'critical',
+          file: 'calc.py',
+          startLine: 2,
+          endLine: 2,
+          message: 'Dynamic eval execution allows arbitrary code',
+          status: 'confirmed',
+          fix: {
+            replacement: '    return ast.literal_eval(expr)',
+            startLine: 2,
+            endLine: 2,
+          },
+        },
+      ],
+    })
+
+    // Exactly 1 comment posted for calc.py:2
+    expect(postReviewComment).toHaveBeenCalledTimes(1)
+    const callArg = postReviewComment.mock.calls[0][0]
+    expect(callArg.filePath).toBe('calc.py')
+    expect(callArg.startLine).toBe(2)
+
+    // Leads with LLM message
+    expect(callArg.comment).toContain('Dynamic eval execution allows arbitrary code')
+    // Lists detectors that found it
+    expect(callArg.comment).toContain(
+      'Detected by: bandit B501, ruff S501 · LLM confirmed'
+    )
+    // Includes suggestion block exactly once
+    const suggestionMatches = callArg.comment.match(/```suggestion/g)
+    expect(suggestionMatches).toHaveLength(1)
+  })
+
+  it('report node populates Confirmed and Dismissed counts in analyzerReports', async () => {
+    const postReviewComment = vi.fn().mockResolvedValue('url')
+    const postSummary = vi.fn().mockResolvedValue('url')
+    const node = report({
+      createReporter: () => ({ postReviewComment, postSummary }) as any,
+    })
+
+    await node({
+      ...baseState,
+      analyzerReports: [
+        {
+          tool: 'bandit',
+          backend: 'docker',
+          status: 'ok',
+          findings: 3,
+          durationMs: 1200,
+        },
+        {
+          tool: 'ruff',
+          backend: 'docker',
+          status: 'ok',
+          findings: 1,
+          durationMs: 400,
+        },
+      ],
+      staticFindings: [
+        {
+          id: 'b1',
+          source: 'bandit',
+          ruleId: 'B602',
+          severity: 'high',
+          file: 'src/main.ts',
+          startLine: 1,
+          endLine: 1,
+          message: 'issue 1',
+          status: 'confirmed',
+        },
+        {
+          id: 'b2',
+          source: 'bandit',
+          ruleId: 'B603',
+          severity: 'high',
+          file: 'src/main.ts',
+          startLine: 2,
+          endLine: 2,
+          message: 'issue 2',
+          status: 'confirmed',
+        },
+        {
+          id: 'b3',
+          source: 'bandit',
+          ruleId: 'B604',
+          severity: 'low',
+          file: 'src/main.ts',
+          startLine: 3,
+          endLine: 3,
+          message: 'issue 3',
+          status: 'dismissed',
+        },
+        {
+          id: 'r1',
+          source: 'ruff',
+          ruleId: 'S101',
+          severity: 'medium',
+          file: 'src/main.ts',
+          startLine: 4,
+          endLine: 4,
+          message: 'issue 4',
+          status: 'confirmed',
+        },
+      ],
+      llmFindings: [],
+    })
+
+    expect(postSummary).toHaveBeenCalled()
+    const summaryRows = postSummary.mock.calls[0][1]
+    expect(summaryRows).toBeDefined()
+    expect(summaryRows).toHaveLength(2)
+
+    const banditRow = summaryRows.find((r: any) => r.tool === 'bandit')
+    expect(banditRow.confirmed).toBe(2)
+    expect(banditRow.dismissed).toBe(1)
+
+    const ruffRow = summaryRows.find((r: any) => r.tool === 'ruff')
+    expect(ruffRow.confirmed).toBe(1)
+    expect(ruffRow.dismissed).toBe(0)
   })
 
   it('report node skips findings whose id was rejected', async () => {

@@ -98,6 +98,11 @@ Across the 3 live benchmark runs (Runs 1, 2 & 3), 7 out of 9 logic regression op
 - In Run 1, 21 patches were generated. Every patch was tested using `git apply --check` against the repository workspace:
   - 21 / 21 (100%) passed `git apply --check`.
   - All patches adhered to the surgical bounds rule ($\le 60$ lines modified).
+- **Syntax Validation & Patch Quality Delta (Post-E7 Update):**
+  - Historical eval runs (Run 1–3 recorded in `eval-results/`) scored patch validity via `git apply --check` (context and hunk matching).
+  - With the addition of post-apply AST syntax validation in `buildPatch`, patches must both apply cleanly and parse as syntactically valid code (0 introduced `ERROR`/`MISSING` nodes in ast-grep, and 0 `IndentationError`/`SyntaxError` in Python).
+  - Patches that fail syntax validation are rejected (`status: "invalid_syntax"`, no suggestion posted, finding kept).
+  - Fixes are expanded to enclosing statements to guarantee valid syntactic units, preventing orphan block indentations.
 
 ---
 

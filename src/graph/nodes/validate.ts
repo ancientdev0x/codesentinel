@@ -1,7 +1,7 @@
 import path from 'node:path'
 import * as v from 'valibot'
 import { FindingSchema, type Finding, normalizeFinding } from '../../review/findings'
-import { buildPatch, type Patch } from '../../review/patch'
+import { buildPatch, PatchError, type Patch } from '../../review/patch'
 import type { ReviewStateType, ReviewStateUpdate, StageError } from '../state'
 import type { ReviewFileWithDiff } from '../../review/diff'
 
@@ -97,6 +97,15 @@ export const validate = (deps?: ValidateDeps) => {
           try {
             await doBuildPatch(state.cfg.workspace, finding)
           } catch (patchErr: unknown) {
+            if (patchErr instanceof PatchError && patchErr.kind === 'invalid_syntax') {
+              console.warn(
+                `[CodeSentinel] Patch for finding ${finding.id} has invalid syntax; rejecting patch but keeping finding:`,
+                patchErr.message
+              )
+              const { fix: _discardedFix, ...rest } = finding
+              validLlmFindings.push(rest as Finding)
+              continue
+            }
             errors.push({
               stage: 'validate',
               kind: 'bad_patch',
