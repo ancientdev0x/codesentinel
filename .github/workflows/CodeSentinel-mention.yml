@@ -20,8 +20,12 @@ jobs:
     if: >-
       ${{ github.event.issue.pull_request &&
           github.event.comment.user.type != 'Bot' &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
           contains(github.event.comment.body, '/CodeSentinel') &&
-          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) }}
+          !contains(github.event.comment.body, '/codesentinel apply') &&
+          !contains(github.event.comment.body, '/codesentinel reject') &&
+          !contains(github.event.comment.body, '/CodeSentinel apply') &&
+          !contains(github.event.comment.body, '/CodeSentinel reject') }}
     runs-on: ubuntu-latest
     steps:
       - name: Resolve PR refs
@@ -51,3 +55,174 @@ jobs:
           PR_NUMBER: ${{ github.event.issue.number }}
           BASE_SHA: ${{ steps.pr.outputs.base_sha }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+
+  patch:
+    # Applies or rejects a patch when an authorized collaborator comments
+    # "/codesentinel apply <id>" or "/codesentinel reject <id>".
+    # Checks out the PR's head branch (not the merge ref) and never executes PR code.
+    if: >-
+      ${{ github.event.issue.pull_request &&
+          github.event.comment.user.type != 'Bot' &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+          (contains(github.event.comment.body, '/codesentinel apply') ||
+           contains(github.event.comment.body, '/codesentinel reject') ||
+           contains(github.event.comment.body, '/CodeSentinel apply') ||
+           contains(github.event.comment.body, '/CodeSentinel reject')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Resolve PR details
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          data=$(gh pr view "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" --json headRefName,headRefOid,isCrossRepository)
+          echo "head_ref=$(echo "$data" | jq -r .headRefName)" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(echo "$data" | jq -r .headRefOid)" >> "$GITHUB_OUTPUT"
+          echo "is_fork=$(echo "$data" | jq -r .isCrossRepository)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out PR head branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply or reject patch
+        uses: actions/github-script@v7
+        env:
+          IS_FORK: ${{ steps.pr.outputs.is_fork }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { execFileSync } = require('node:child_process');
+            const fs = require('node:fs');
+            const path = require('node:path');
+
+            const body = context.payload.comment.body || '';
+            const match = body.match(/^\/codesentinel\s+(apply|reject)\s+([0-9a-f]{8})\b/im);
+            if (!match) return;
+
+            const action = match[1].toLowerCase();
+            const patchId = match[2].toLowerCase();
+            const authorLogin = context.payload.comment.user.login;
+
+            const reply = async (text) => {
+              return github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: text,
+              });
+            };
+
+            const react = async (content) => {
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: context.payload.comment.id,
+                  content,
+                });
+              } catch (_) {}
+            };
+
+            const comments = await github.rest.pulls.listReviewComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.issue.number,
+            });
+
+            const target = comments.data.find((c) =>
+              c.body?.includes(`<!-- codesentinel:patch id=${patchId}`)
+            );
+
+            if (!target) {
+              await reply(`Could not find any patch comment matching ID \`${patchId}\`.`);
+              return;
+            }
+
+            const botLogin = target.user?.login || '';
+            const isBot =
+              botLogin === 'github-actions[bot]' ||
+              botLogin.endsWith('[bot]') ||
+              target.user?.type === 'Bot';
+            if (!isBot) {
+              await reply('Security error: patch comment was not authored by github-actions[bot].');
+              return;
+            }
+
+            const shaMatch = target.body.match(/<!--\s*codesentinel:patch\s+[^>]*\bsha=([\w.-]+)\b/i);
+            const diffMatch = target.body.match(/```diff\r?\n([\s\S]*?)\r?\n```/);
+            const findingMatch = target.body.match(/<!--\s*codesentinel:patch\s+[^>]*\bfinding=([^\s>]+)\b/i);
+
+            if (!shaMatch || !diffMatch) {
+              await reply(`Failed to parse patch diff for ID \`${patchId}\`.`);
+              return;
+            }
+
+            const currentHeadSha = process.env.HEAD_SHA;
+            if (shaMatch[1] !== currentHeadSha) {
+              await reply(`Patch \`${patchId}\` is stale (generated against ${shaMatch[1].slice(0, 7)}, current head is ${currentHeadSha.slice(0, 7)}). Please re-run review.`);
+              return;
+            }
+
+            if (action === 'apply') {
+              if (process.env.IS_FORK === 'true') {
+                await reply('Cannot apply patches to fork pull requests automatically.');
+                return;
+              }
+
+              const diff = diffMatch[1];
+              if (diff.includes('../') || diff.includes('..\\')) {
+                await reply('Security violation: patch diff contains path traversal.');
+                return;
+              }
+
+              try {
+                execFileSync('git', ['apply', '--check', '-'], { input: diff, stdio: ['pipe', 'pipe', 'pipe'] });
+                execFileSync('git', ['apply', '-'], { input: diff, stdio: ['pipe', 'pipe', 'pipe'] });
+                execFileSync('git', ['config', 'user.name', 'github-actions[bot]']);
+                execFileSync('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com']);
+                execFileSync('git', ['add', '.']);
+                const commitMsg = `fix: apply CodeSentinel patch ${patchId}\n\nCo-authored-by: ${authorLogin} <${authorLogin}@users.noreply.github.com>`;
+                execFileSync('git', ['commit', '-m', commitMsg]);
+                const commitSha = execFileSync('git', ['rev-parse', 'HEAD']).toString().trim();
+                execFileSync('git', ['push', 'origin', `HEAD:${process.env.HEAD_REF}`]);
+
+                await react('+1');
+                await reply(`Applied patch \`${patchId}\` in commit \`${commitSha}\`.`);
+              } catch (err) {
+                await reply(`Failed to apply patch \`${patchId}\`: ${err.message || String(err)}`);
+              }
+              return;
+            }
+
+            if (action === 'reject') {
+              await react('-1');
+              const updatedBody = `${target.body}\n\n> ❌ **Rejected by @${authorLogin}**`;
+              await github.rest.pulls.updateReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: target.id,
+                body: updatedBody,
+              });
+
+              fs.mkdirSync('.CodeSentinel', { recursive: true });
+              const storePath = path.join('.CodeSentinel', 'rejected-patches.json');
+              let rejected = {};
+              try { rejected = JSON.parse(fs.readFileSync(storePath, 'utf8')); } catch (_) {}
+              const now = new Date().toISOString();
+              rejected[patchId] = { user: authorLogin, timestamp: now };
+              if (findingMatch) {
+                rejected[findingMatch[1]] = { user: authorLogin, timestamp: now, patchId };
+              }
+              fs.writeFileSync(storePath, JSON.stringify(rejected, null, 2), 'utf8');
+
+              await reply(`Patch \`${patchId}\` marked as rejected.`);
+            }
