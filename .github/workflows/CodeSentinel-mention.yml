@@ -1,0 +1,226 @@
+name: CodeSentinel /CodeSentinel
+
+# Run CodeSentinel on demand when someone comments "/CodeSentinel" on a pull request.
+# No server needed — this runs the action in CI (the "Actions on comment" mode).
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  CodeSentinel:
+    # Only PR comments that contain "/CodeSentinel", from a non-bot user who is a
+    # trusted collaborator. The author_association gate is required: this job
+    # has write permissions + secrets and checks out PR head code, so allowing
+    # arbitrary (fork) authors to trigger it would be a "pwn request" risk.
+    if: >-
+      ${{ github.event.issue.pull_request &&
+          github.event.comment.user.type != 'Bot' &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+          contains(github.event.comment.body, '/CodeSentinel') &&
+          !contains(github.event.comment.body, '/codesentinel apply') &&
+          !contains(github.event.comment.body, '/codesentinel reject') &&
+          !contains(github.event.comment.body, '/CodeSentinel apply') &&
+          !contains(github.event.comment.body, '/CodeSentinel reject') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve PR refs
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          data=$(gh pr view "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" --json headRefOid,baseRefOid)
+          echo "head_sha=$(echo "$data" | jq -r .headRefOid)" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$(echo "$data" | jq -r .baseRefOid)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+          fetch-depth: 0
+
+      - name: Ensure base commit is present
+        run: git fetch --no-tags --depth=1 origin "${{ steps.pr.outputs.base_sha }}" || true
+
+      - name: Run CodeSentinel 🚢
+        uses: ./
+        with:
+          MODEL: openai/gpt-5.4-nano
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+
+  patch:
+    # Applies or rejects a patch when an authorized collaborator comments
+    # "/codesentinel apply <id>" or "/codesentinel reject <id>".
+    # Checks out the PR's head branch (not the merge ref) and never executes PR code.
+    if: >-
+      ${{ github.event.issue.pull_request &&
+          github.event.comment.user.type != 'Bot' &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+          (contains(github.event.comment.body, '/codesentinel apply') ||
+           contains(github.event.comment.body, '/codesentinel reject') ||
+           contains(github.event.comment.body, '/CodeSentinel apply') ||
+           contains(github.event.comment.body, '/CodeSentinel reject')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Resolve PR details
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          data=$(gh pr view "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" --json headRefName,headRefOid,isCrossRepository)
+          echo "head_ref=$(echo "$data" | jq -r .headRefName)" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(echo "$data" | jq -r .headRefOid)" >> "$GITHUB_OUTPUT"
+          echo "is_fork=$(echo "$data" | jq -r .isCrossRepository)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out PR head branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply or reject patch
+        uses: actions/github-script@v7
+        env:
+          IS_FORK: ${{ steps.pr.outputs.is_fork }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { execFileSync } = require('node:child_process');
+
+            const body = context.payload.comment.body || '';
+            const match = body.match(/^\/codesentinel\s+(apply|reject)\s+([0-9a-f]{8})\b/im);
+            if (!match) return;
+
+            const action = match[1].toLowerCase();
+            const patchId = match[2].toLowerCase();
+            const authorLogin = context.payload.comment.user.login;
+
+            const reply = async (text) => {
+              return github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: text,
+              });
+            };
+
+            const react = async (content) => {
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: context.payload.comment.id,
+                  content,
+                });
+              } catch (_) {}
+            };
+
+            const comments = await github.paginate(github.rest.pulls.listReviewComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.issue.number,
+              per_page: 100,
+            });
+
+            const target = comments.find((c) =>
+              c.body?.includes(`<!-- codesentinel:patch id=${patchId}`)
+            );
+
+            if (!target) {
+              await reply(`Could not find any patch comment matching ID \`${patchId}\`.`);
+              return;
+            }
+
+            const botLogin = target.user?.login || '';
+            if (botLogin !== 'github-actions[bot]') {
+              await reply('Security error: patch comment was not authored by github-actions[bot].');
+              return;
+            }
+
+            const shaMatch = target.body.match(/<!--\s*codesentinel:patch\s+[^>]*\bsha=([\w.-]+)\b/i);
+            const diffMatch = target.body.match(/```diff\r?\n([\s\S]*?)\r?\n```/);
+            const findingMatch = target.body.match(/<!--\s*codesentinel:patch\s+[^>]*\bfinding=([^\s>]+)\b/i);
+
+            if (!shaMatch || !diffMatch) {
+              await reply(`Failed to parse patch diff for ID \`${patchId}\`.`);
+              return;
+            }
+
+            const currentHeadSha = process.env.HEAD_SHA;
+            if (shaMatch[1] !== currentHeadSha) {
+              await reply(`Patch \`${patchId}\` is stale (generated against ${shaMatch[1].slice(0, 7)}, current head is ${currentHeadSha.slice(0, 7)}). Please re-run review.`);
+              return;
+            }
+
+            if (action === 'apply') {
+              if (process.env.IS_FORK === 'true') {
+                await reply('Cannot apply patches to fork pull requests automatically.');
+                return;
+              }
+
+              const diff = diffMatch[1];
+              if (diff.includes('../') || diff.includes('..\\')) {
+                await reply('Security violation: patch diff contains path traversal.');
+                return;
+              }
+
+              const files = new Set();
+              for (const line of diff.split('\n')) {
+                if (line.startsWith('+++ b/')) {
+                  files.add(line.slice(6).trim());
+                } else if (line.startsWith('--- a/') && !line.startsWith('--- a/dev/null')) {
+                  files.add(line.slice(6).trim());
+                }
+              }
+              const fileList = Array.from(files).filter(Boolean);
+              if (fileList.length === 0) {
+                await reply('Security violation or error: no valid file paths found in patch diff.');
+                return;
+              }
+
+              try {
+                execFileSync('git', ['apply', '--check', '-'], { input: diff, stdio: ['pipe', 'pipe', 'pipe'] });
+                execFileSync('git', ['apply', '-'], { input: diff, stdio: ['pipe', 'pipe', 'pipe'] });
+                execFileSync('git', ['config', 'user.name', 'github-actions[bot]']);
+                execFileSync('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com']);
+                execFileSync('git', ['add', '-A', '--', ...fileList]);
+                const commitMsg = `fix: apply CodeSentinel patch ${patchId}\n\nCo-authored-by: ${authorLogin} <${authorLogin}@users.noreply.github.com>`;
+                execFileSync('git', ['commit', '-m', commitMsg]);
+                const commitSha = execFileSync('git', ['rev-parse', 'HEAD']).toString().trim();
+                execFileSync('git', ['push', 'origin', `HEAD:${process.env.HEAD_REF}`]);
+
+                await react('+1');
+                await reply(`Applied patch \`${patchId}\` in commit \`${commitSha}\`.`);
+              } catch (err) {
+                await reply(`Failed to apply patch \`${patchId}\`: ${err.message || String(err)}`);
+              }
+              return;
+            }
+
+            if (action === 'reject') {
+              await react('-1');
+              const updatedBody = `${target.body}\n\n> ❌ **Rejected by @${authorLogin}**`;
+              await github.rest.pulls.updateReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: target.id,
+                body: updatedBody,
+              });
+
+              await reply(`Patch \`${patchId}\` marked as rejected.`);
+            }

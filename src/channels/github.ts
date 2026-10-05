@@ -4,6 +4,7 @@ import { defineTool, dispatch } from '@flue/runtime'
 import { Octokit } from 'octokit'
 import * as v from 'valibot'
 import mention from '../agents/mention'
+import { handlePatchCommand, parsePatchCommand } from '../review/patch-commands'
 
 /**
  * GitHub channel — the webhook (server) deployment mode. Lets people summon
@@ -42,6 +43,22 @@ export const channel: GitHubChannel = createGitHubChannel({
     if (delivery.name === 'issue_comment' && delivery.payload.action === 'created') {
       const { repository, issue, comment, sender } = delivery.payload
       if (sender?.type === 'Bot') return undefined
+
+      if (issue.pull_request && parsePatchCommand(comment.body)) {
+        await handlePatchCommand({
+          octokit: client,
+          owner: repository.owner.login,
+          repo: repository.name,
+          pullNumber: issue.number,
+          commentId: comment.id,
+          commentBody: comment.body,
+          authorAssociation: comment.author_association,
+          authorLogin: sender?.login || '',
+          isReviewComment: false,
+        })
+        return undefined
+      }
+
       if (!comment.body?.toLowerCase().includes(MENTION)) return undefined
 
       const ref: IssueRef = {
@@ -68,6 +85,22 @@ export const channel: GitHubChannel = createGitHubChannel({
     ) {
       const { repository, pull_request, comment, sender } = delivery.payload
       if (sender?.type === 'Bot') return undefined
+
+      if (parsePatchCommand(comment.body)) {
+        await handlePatchCommand({
+          octokit: client,
+          owner: repository.owner.login,
+          repo: repository.name,
+          pullNumber: pull_request.number,
+          commentId: comment.id,
+          commentBody: comment.body,
+          authorAssociation: comment.author_association,
+          authorLogin: sender?.login || '',
+          isReviewComment: true,
+        })
+        return undefined
+      }
+
       if (!comment.body?.toLowerCase().includes(MENTION)) return undefined
 
       const ref: IssueRef = {

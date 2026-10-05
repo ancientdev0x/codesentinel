@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-10-05T06:39:08.422Z",
+  "detectors": {
+    "ast-grep": {
+      "tp": 15,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1
+    },
+    "bandit": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 6,
+      "precision": 1,
+      "recall": 0.333
+    },
+    "ruff": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 3,
+      "precision": 1,
+      "recall": 0.571
+    },
+    "tsc": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1
+    }
+  },
+  "union": {
+    "tp": 18,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1,
+    "recall": 1
+  },
+  "totalLabels": 25,
+  "deterministicLabelsCount": 18,
+  "cleanLabelsCount": 4,
+  "cleanFindingsCount": 0,
+  "markdownTable": "| Detector | TP | FP | FN | Precision | Recall |\n|---|---|---|---|---|---|\n| ast-grep | 15 | 0 | 0 | 100.0% | 100.0% |\n| bandit | 3 | 0 | 6 | 100.0% | 33.3% |\n| ruff | 4 | 0 | 3 | 100.0% | 57.1% |\n| tsc | 1 | 0 | 0 | 100.0% | 100.0% |\n| **Union** | **18** | **0** | **0** | **100.0%** | **100.0%** |"
+}

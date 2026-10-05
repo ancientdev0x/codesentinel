@@ -57,10 +57,14 @@ describe('decideTier', () => {
 
 describe('isoWeekBranch', () => {
   it('formats CodeSentinel-qa/<isoYear>-W<week>', () => {
-    expect(isoWeekBranch(new Date('2026-06-24T00:00:00Z'))).toBe('CodeSentinel-qa/2026-W26')
+    expect(isoWeekBranch(new Date('2026-06-24T00:00:00Z'))).toBe(
+      'CodeSentinel-qa/2026-W26'
+    )
   })
   it('zero-pads single-digit weeks', () => {
-    expect(isoWeekBranch(new Date('2026-01-05T00:00:00Z'))).toBe('CodeSentinel-qa/2026-W02')
+    expect(isoWeekBranch(new Date('2026-01-05T00:00:00Z'))).toBe(
+      'CodeSentinel-qa/2026-W02'
+    )
   })
 })
 
@@ -70,6 +74,8 @@ describe('brokenFlowBranch', () => {
   })
   it('slugifies the flow id (lowercase, dash-safe, trimmed)', () => {
     expect(brokenFlowBranch('Add to Cart!')).toBe('CodeSentinel-qa/fix/add-to-cart')
-    expect(brokenFlowBranch('user/profile_edit')).toBe('CodeSentinel-qa/fix/user-profile-edit')
+    expect(brokenFlowBranch('user/profile_edit')).toBe(
+      'CodeSentinel-qa/fix/user-profile-edit'
+    )
   })
 })

@@ -14,7 +14,10 @@ export interface ReviewCommentInput {
 /** Posts review output to GitHub (CI) or to a local file (dev). */
 export interface Reporter {
   postReviewComment: (input: ReviewCommentInput) => Promise<string | undefined>
-  postSummary: (comment: string) => Promise<string | undefined>
+  postSummary: (
+    comment: string,
+    analyzerRows?: import('../common/formatting/summary').AnalyzerReportRow[]
+  ) => Promise<string | undefined>
 }
 
 /** Make a workspace-absolute path relative to the repo root for the GitHub API. */
@@ -65,8 +68,8 @@ const createGithubReporter = (cfg: ReviewConfig): Reporter => {
       }
     },
 
-    postSummary: async (comment) => {
-      const body = formatSummary(comment)
+    postSummary: async (comment, analyzerRows) => {
+      const body = formatSummary(comment, analyzerRows)
       const { data: existing } = await octokit.rest.issues.listComments({
         owner,
         repo,
@@ -118,10 +121,72 @@ const createLocalReporter = (cfg: ReviewConfig): Reporter => {
       await appendFile(reviewFile, `### ${path}${loc}\n\n${comment}\n\n`)
       return `Comment written to ${reviewFile}`
     },
-    postSummary: async (comment) => {
+    postSummary: async (comment, analyzerRows) => {
       await ensureDir()
-      await appendFile(reviewFile, `${formatSummary(comment)}\n`)
+      await appendFile(reviewFile, `${formatSummary(comment, analyzerRows)}\n`)
       return `Summary written to ${reviewFile}`
+    },
+  }
+}
+
+/**
+ * Wraps a primary reporter with a fallback reporter. If the primary throws an HTTP 403 Forbidden
+ * (e.g. read-only token), it logs a warning once and switches all future operations to the fallback.
+ */
+export const fallbackOnForbidden = (primary: Reporter, fallback: Reporter): Reporter => {
+  let switched = false
+
+  const isForbidden = (err: unknown): boolean => {
+    if (!err) return false
+    const msg = String(err)
+    if (
+      msg.includes('403') ||
+      msg.includes('Forbidden') ||
+      msg.includes('Resource not accessible')
+    ) {
+      return true
+    }
+    if (typeof err === 'object' && err !== null) {
+      if ('status' in err && (err as { status: number }).status === 403) return true
+      if ('cause' in err && isForbidden((err as { cause: unknown }).cause)) return true
+    }
+    return false
+  }
+
+  return {
+    postReviewComment: async (input) => {
+      if (switched) {
+        return fallback.postReviewComment(input)
+      }
+      try {
+        return await primary.postReviewComment(input)
+      } catch (err) {
+        if (isForbidden(err)) {
+          switched = true
+          console.warn(
+            '[CodeSentinel] GITHUB_TOKEN does not have write access to post review comments (HTTP 403). Falling back to local file output.'
+          )
+          return fallback.postReviewComment(input)
+        }
+        throw err
+      }
+    },
+    postSummary: async (comment, analyzerRows) => {
+      if (switched) {
+        return fallback.postSummary(comment, analyzerRows)
+      }
+      try {
+        return await primary.postSummary(comment, analyzerRows)
+      } catch (err) {
+        if (isForbidden(err)) {
+          switched = true
+          console.warn(
+            '[CodeSentinel] GITHUB_TOKEN does not have write access to post summary (HTTP 403). Falling back to local file output.'
+          )
+          return fallback.postSummary(comment, analyzerRows)
+        }
+        throw err
+      }
     },
   }
 }
@@ -136,5 +201,10 @@ export const createReporter = (cfg: ReviewConfig): Reporter => {
     )
     return createLocalReporter(cfg)
   }
-  return cfg.platform === 'github' ? createGithubReporter(cfg) : createLocalReporter(cfg)
+  if (cfg.platform === 'github') {
+    const github = createGithubReporter(cfg)
+    const local = createLocalReporter(cfg)
+    return fallbackOnForbidden(github, local)
+  }
+  return createLocalReporter(cfg)
 }

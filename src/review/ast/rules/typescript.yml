@@ -1,0 +1,77 @@
+rules:
+  - id: ts-eval
+    language: typescript
+    severity: high
+    message: Use of eval or new Function allows arbitrary dynamic code execution.
+    metadata:
+      cwe: CWE-95
+    rule:
+      any:
+        - pattern: eval($X)
+        - pattern: new Function($$$ARGS)
+
+  - id: ts-child-exec-template
+    language: typescript
+    severity: high
+    message: Command execution via exec or execSync with template interpolation or concatenation is vulnerable to command injection.
+    metadata:
+      cwe: CWE-78
+    rule:
+      all:
+        - any:
+            - pattern: exec($$$ARGS)
+            - pattern: execSync($$$ARGS)
+        - has:
+            any:
+              - kind: template_substitution
+              - kind: binary_expression
+                regex: \+
+            stopBy: end
+
+  - id: ts-sql-template
+    language: typescript
+    severity: high
+    message: SQL query constructed via template string or concatenation. Use parameterized queries.
+    metadata:
+      cwe: CWE-89
+    rule:
+      all:
+        - pattern: $DB.query($$$ARGS)
+        - has:
+            any:
+              - kind: template_substitution
+              - kind: binary_expression
+                regex: \+
+            stopBy: end
+
+  - id: ts-innerhtml
+    language: typescript
+    severity: high
+    message: Assigning dynamic non-literal content to innerHTML enables Cross-Site Scripting (XSS).
+    metadata:
+      cwe: CWE-79
+    rule:
+      all:
+        - pattern: $E.innerHTML = $X
+        - not:
+            has:
+              kind: string
+              stopBy: end
+
+  - id: ts-hardcoded-secret
+    language: typescript
+    severity: medium
+    message: Potential hardcoded secret or credential assigned to variable.
+    metadata:
+      cwe: CWE-798
+    rule:
+      all:
+        - kind: variable_declarator
+        - has:
+            field: name
+            regex: (?i)(secret|token|password|api_?key)
+            stopBy: end
+        - has:
+            field: value
+            kind: string
+            stopBy: end

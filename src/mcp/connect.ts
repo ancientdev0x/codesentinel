@@ -1,4 +1,5 @@
 import { type ToolDefinition, connectMcpServer } from '@flue/runtime'
+import { traceTools } from '../observability/tools'
 import type { McpServerInput } from '../review/config'
 
 export interface McpConnection {
@@ -40,7 +41,7 @@ export const connectMcpServers = async (
   ).filter((c): c is NonNullable<typeof c> => c !== null)
 
   return {
-    tools: connections.flatMap((c) => c.tools),
+    tools: traceTools(connections.flatMap((c) => c.tools)),
     close: async () => {
       await Promise.all(connections.map((c) => c.close().catch(() => {})))
     },

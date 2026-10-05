@@ -36,3 +36,10 @@ cdk.context.json
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Tool cache
+.commandcode/
+
+# Evaluation results
+eval-results/*
+!eval-results/*.json

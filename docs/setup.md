@@ -122,4 +122,4 @@ Use a `provider/model` string and supply the matching credential:
 | `cloudflare-workers-ai/<model>` | `cloudflare-workers-ai/@cf/openai/gpt-oss-120b` | `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID` |
 | `cloudflare-ai-gateway/<model>` | — | `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_GATEWAY_ID` |
 
-For Cloudflare Workers AI, prefer larger models with strong tool-calling (e.g. `@cf/openai/gpt-oss-120b`, `@cf/qwen/qwen3-30b-a3b-fp8`, `@cf/zai-org/glm-5.2`); small models like `@cf/meta/llama-3.3-70b` are weak at tool-calling. Custom OpenAI-compatible providers (Ollama, gateways) are registered with `registerProvider()` in `src/app.ts`.
+For Cloudflare Workers AI, prefer larger models with strong tool-calling (e.g. `@cf/openai/gpt-oss-120b`, `@cf/qwen/qwen3-30b-a3b-fp8`, `@cf/zai-org/glm-5.2`); small models like `@cf/meta/llama-3.3-70b` are weak at tool-calling. Custom OpenAI-compatible providers (Ollama, gateways) are registered with flue's `registerProvider()` in a flue app entry — CodeSentinel itself ships no custom-provider entry, so set `CodeSentinel_MODEL` to a built-in provider string.

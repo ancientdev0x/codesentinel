@@ -57,6 +57,45 @@ inputs:
   HEAD_SHA:
     description: "Head commit SHA to diff. Defaults to the pull_request event."
     required: false
+  STATIC_ANALYSIS:
+    description: "Enable static analysis tools (Bandit, Ruff). Default: 'true'."
+    required: false
+    default: "true"
+  SANDBOX:
+    description: "Sandbox execution mode: docker | host | auto. Default: 'auto'."
+    required: false
+    default: "auto"
+  ANALYZER_TIMEOUT_MS:
+    description: "Analyzer subprocess/container execution timeout in milliseconds. Default: 60000."
+    required: false
+    default: "60000"
+  AST_CHECKS:
+    description: "Enable AST-level checks on changed code fragments. Default: 'true'."
+    required: false
+    default: "true"
+  HITL_MODE:
+    description: "Human-in-the-loop mode: off | suggest | interactive. Default: 'suggest'."
+    required: false
+    default: "suggest"
+  MAX_ATTEMPTS:
+    description: "Maximum review self-correction retry attempts. Default: 3."
+    required: false
+    default: "3"
+  PR_URL:
+    description: "GitHub pull request URL to review (e.g. https://github.com/owner/repo/pull/123)."
+    required: false
+  LANGFUSE_PUBLIC_KEY:
+    description: "Langfuse public API key for tracing"
+    required: false
+  LANGFUSE_SECRET_KEY:
+    description: "Langfuse secret API key for tracing"
+    required: false
+  LANGFUSE_HOST:
+    description: "Langfuse host URL (e.g. https://cloud.langfuse.com)"
+    required: false
+  LANGFUSE_BASE_URL:
+    description: "Langfuse base URL (alias for LANGFUSE_HOST)"
+    required: false
   GITHUB_TOKEN:
     description: "GitHub token used to post review comments"
     required: true
@@ -72,6 +111,22 @@ runs:
       # --include=dev so @flue/cli (a devDependency, needed by `npx flue`) is
       # installed even if the runner sets NODE_ENV=production.
       run: npm install --prefix "$GITHUB_ACTION_PATH" --include=dev --no-audit --no-fund --loglevel=error
+
+    - name: Build analyzer container
+      if: ${{ inputs.STATIC_ANALYSIS != 'false' }}
+      continue-on-error: true
+      shell: bash
+      run: |
+        docker build -t codesentinel-analyzers:0.1.0 \
+          -f "$GITHUB_ACTION_PATH/docker/analyzers.Dockerfile" \
+          "$GITHUB_ACTION_PATH/docker"
+
+    - name: Install fallback analyzers on host
+      if: ${{ inputs.STATIC_ANALYSIS != 'false' }}
+      continue-on-error: true
+      shell: bash
+      run: |
+        pipx install bandit==1.9.4 ruff==0.16.10
 
     - name: Run CodeSentinel review 🚢
       shell: bash
@@ -100,11 +155,22 @@ runs:
         CodeSentinel_CUSTOM_INSTRUCTIONS: ${{ inputs.CUSTOM_INSTRUCTIONS }}
         CodeSentinel_MCP_SERVERS: ${{ inputs.MCP_SERVERS }}
         CodeSentinel_TELEMETRY: ${{ inputs.TELEMETRY }}
+        CodeSentinel_STATIC_ANALYSIS: ${{ inputs.STATIC_ANALYSIS }}
+        CodeSentinel_SANDBOX: ${{ inputs.SANDBOX }}
+        CodeSentinel_ANALYZER_TIMEOUT_MS: ${{ inputs.ANALYZER_TIMEOUT_MS }}
+        CodeSentinel_AST_CHECKS: ${{ inputs.AST_CHECKS }}
+        CodeSentinel_HITL_MODE: ${{ inputs.HITL_MODE }}
+        CodeSentinel_MAX_ATTEMPTS: ${{ inputs.MAX_ATTEMPTS }}
+        CodeSentinel_PR_URL: ${{ inputs.PR_URL }}
+        LANGFUSE_PUBLIC_KEY: ${{ inputs.LANGFUSE_PUBLIC_KEY || env.LANGFUSE_PUBLIC_KEY }}
+        LANGFUSE_SECRET_KEY: ${{ inputs.LANGFUSE_SECRET_KEY || env.LANGFUSE_SECRET_KEY }}
+        LANGFUSE_HOST: ${{ inputs.LANGFUSE_HOST || inputs.LANGFUSE_BASE_URL || env.LANGFUSE_HOST || env.LANGFUSE_BASE_URL }}
+        LANGFUSE_BASE_URL: ${{ inputs.LANGFUSE_BASE_URL || inputs.LANGFUSE_HOST || env.LANGFUSE_BASE_URL || env.LANGFUSE_HOST }}
       run: |
         npx flue run review \
           --root "$GITHUB_ACTION_PATH" \
           --target node \
-          --payload "{\"platform\":\"github\",\"workspace\":\"$GITHUB_WORKSPACE\"}"
+          --input "{\"platform\":\"github\",\"workspace\":\"$GITHUB_WORKSPACE\"}"
 branding:
   icon: "git-pull-request"
   color: "red"

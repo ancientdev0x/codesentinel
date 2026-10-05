@@ -10,6 +10,7 @@ const execFileAsync = promisify(execFile)
 /** A changed file plus the raw unified diff for that file. */
 export interface ReviewFileWithDiff extends ReviewFile {
   diff: string
+  isPureDeletion?: boolean
 }
 
 /** Parsed changed file (no content) — what {@link parseDiff} returns. */
@@ -29,8 +30,8 @@ const DIFF_OPTS = ['--diff-filter=AMRT', '-U0']
  * injection. We also run git via execFile (no shell), so there is no shell to
  * inject into either.
  */
-const SAFE_REF = /^[\w./~^-]+$/
-const assertSafeRef = (value: string, label: string): string => {
+export const SAFE_REF = /^[\w./~^-]+$/
+export const assertSafeRef = (value: string, label: string): string => {
   if (!SAFE_REF.test(value) || value.startsWith('-')) {
     throw new Error(`Invalid ${label}: ${JSON.stringify(value)}`)
   }

@@ -2,6 +2,7 @@
   "name": "CodeSentinel",
   "version": "0.21.2",
   "description": "an extensible code review agent",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/server.mjs",
   "bin": {
@@ -23,6 +24,8 @@
     "version": "changeset version",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "vitest run tests/eval/deterministic.test.ts",
+    "eval:full": "vitest run tests/eval/live-full-pipeline.test.ts",
     "check": "oxlint && oxfmt --check",
     "check:types": "tsc --noEmit",
     "check:fix": "oxlint --fix && oxfmt",
@@ -52,11 +55,19 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
+    "@ast-grep/lang-python": "^0.0.6",
+    "@ast-grep/napi": "^0.45.3",
     "@flue/github": "1.0.0-beta.1",
     "@flue/runtime": "1.0.0-beta.9",
+    "@langchain/core": "^1.2.14",
+    "@langchain/langgraph": "^1.4.19",
+    "@langfuse/otel": "^5.11.1",
+    "@langfuse/tracing": "^5.11.1",
+    "@opentelemetry/sdk-node": "^0.222.0",
     "octokit": "^3.1.0",
     "picomatch": "^4.0.2",
-    "valibot": "^1.4.1"
+    "valibot": "^1.4.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.7.0",

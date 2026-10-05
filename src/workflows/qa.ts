@@ -1,6 +1,7 @@
 import { type JsonValue, type WorkflowRouteHandler, defineWorkflow } from '@flue/runtime'
 import * as v from 'valibot'
 import qaLead from '../agents/qa-lead'
+import { registerCodexProvider } from '../common/codex-auth'
 import { sendQaStarted } from '../common/telemetry'
 import { resolveQaConfig } from '../qa/config'
 import { buildQaKickoff } from '../qa/instructions'
@@ -58,6 +59,7 @@ export default defineWorkflow({
   input: v.object({}),
   async run({ harness }): Promise<JsonValue> {
     const cfg = resolveQaConfig(undefined, process.env)
+    await registerCodexProvider(cfg.model, cfg.thinkingLevel)
 
     sendQaStarted({
       enabled: cfg.telemetry,
