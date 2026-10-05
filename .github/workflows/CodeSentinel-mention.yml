@@ -101,8 +101,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { execFileSync } = require('node:child_process');
-            const fs = require('node:fs');
-            const path = require('node:path');
 
             const body = context.payload.comment.body || '';
             const match = body.match(/^\/codesentinel\s+(apply|reject)\s+([0-9a-f]{8})\b/im);
@@ -132,13 +130,14 @@ jobs:
               } catch (_) {}
             };
 
-            const comments = await github.rest.pulls.listReviewComments({
+            const comments = await github.paginate(github.rest.pulls.listReviewComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.payload.issue.number,
+              per_page: 100,
             });
 
-            const target = comments.data.find((c) =>
+            const target = comments.find((c) =>
               c.body?.includes(`<!-- codesentinel:patch id=${patchId}`)
             );
 
@@ -148,11 +147,7 @@ jobs:
             }
 
             const botLogin = target.user?.login || '';
-            const isBot =
-              botLogin === 'github-actions[bot]' ||
-              botLogin.endsWith('[bot]') ||
-              target.user?.type === 'Bot';
-            if (!isBot) {
+            if (botLogin !== 'github-actions[bot]') {
               await reply('Security error: patch comment was not authored by github-actions[bot].');
               return;
             }
@@ -184,12 +179,26 @@ jobs:
                 return;
               }
 
+              const files = new Set();
+              for (const line of diff.split('\n')) {
+                if (line.startsWith('+++ b/')) {
+                  files.add(line.slice(6).trim());
+                } else if (line.startsWith('--- a/') && !line.startsWith('--- a/dev/null')) {
+                  files.add(line.slice(6).trim());
+                }
+              }
+              const fileList = Array.from(files).filter(Boolean);
+              if (fileList.length === 0) {
+                await reply('Security violation or error: no valid file paths found in patch diff.');
+                return;
+              }
+
               try {
                 execFileSync('git', ['apply', '--check', '-'], { input: diff, stdio: ['pipe', 'pipe', 'pipe'] });
                 execFileSync('git', ['apply', '-'], { input: diff, stdio: ['pipe', 'pipe', 'pipe'] });
                 execFileSync('git', ['config', 'user.name', 'github-actions[bot]']);
                 execFileSync('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com']);
-                execFileSync('git', ['add', '.']);
+                execFileSync('git', ['add', '-A', '--', ...fileList]);
                 const commitMsg = `fix: apply CodeSentinel patch ${patchId}\n\nCo-authored-by: ${authorLogin} <${authorLogin}@users.noreply.github.com>`;
                 execFileSync('git', ['commit', '-m', commitMsg]);
                 const commitSha = execFileSync('git', ['rev-parse', 'HEAD']).toString().trim();
@@ -212,17 +221,6 @@ jobs:
                 comment_id: target.id,
                 body: updatedBody,
               });
-
-              fs.mkdirSync('.CodeSentinel', { recursive: true });
-              const storePath = path.join('.CodeSentinel', 'rejected-patches.json');
-              let rejected = {};
-              try { rejected = JSON.parse(fs.readFileSync(storePath, 'utf8')); } catch (_) {}
-              const now = new Date().toISOString();
-              rejected[patchId] = { user: authorLogin, timestamp: now };
-              if (findingMatch) {
-                rejected[findingMatch[1]] = { user: authorLogin, timestamp: now, patchId };
-              }
-              fs.writeFileSync(storePath, JSON.stringify(rejected, null, 2), 'utf8');
 
               await reply(`Patch \`${patchId}\` marked as rejected.`);
             }
