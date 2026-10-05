@@ -78,7 +78,7 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E5.2 `human_review` node using LangGraph `interrupt()`
   - [ ] E5.3 Local mode: CLI approve/reject/edit loop → `Command({ resume })` → `git apply` (pending manual run)
   - [x] E5.4 GitHub mode: patch comments with ids + `/codesentinel apply|reject <id>` handler
-  - [ ] E5.5 Mention workflow update (needs CI-edit approval)
+  - [x] E5.5 Mention workflow update (needs CI-edit approval)
 - [x] **E6 Langfuse observability** (C4b): [`E6-langfuse-observability.md`](E6-langfuse-observability.md) *(~1d, can start after E0)*
   - [ ] E6.1 OTel + `LangfuseSpanProcessor` bootstrap, env-gated, flush on exit (pending live run)
   - [x] E6.2 Trace per review; span per graph node

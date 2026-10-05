@@ -89,6 +89,7 @@ The command handler is `handlePatchCommand(event)`:
 - It needs `permissions: contents: write, pull-requests: write`.
 - Check out the **head ref**, not `refs/pull/N/head`, so it can push.
 - Never run the PR's own code in this job. It applies a text patch only. No `npm install` of the PR's packages.
+- **Verification:** `.github/workflows/CodeSentinel-mention.yml` updated with separate jobs for `/CodeSentinel` review runs vs `/codesentinel (apply|reject)` patch operations. The `patch` job has `contents: write, pull-requests: write`, checks out the head ref directly with `actions/checkout@v4`, runs isolated GitHub Script without PR code execution, verifies bot-authored comments and fresh SHA, applies via `git apply --check` and `git apply`, commits with approver co-author trailer, pushes to head ref, and records rejection in memory. Validated with `npm run check`.
 
 ## Security notes (do not simplify away)
 - The patch comes from a comment the bot itself posted. Verify the comment author is the bot (`github-actions[bot]`), otherwise anyone could post a fake marker.
