@@ -13,6 +13,7 @@
     "url": "https://github.com/ancientdev0x/CodeSentinel"
   },
   "scripts": {
+    "demo": "vite-node scripts/demo.ts",
     "postinstall": "patch-package",
     "review": "flue run review --target node",
     "qa": "flue run qa --target node",
