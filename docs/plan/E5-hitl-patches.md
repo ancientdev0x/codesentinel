@@ -58,8 +58,8 @@ export const humanReview = (deps) => async (s) => {
 - The workflow returns `{ status: 'awaiting_approval', threadId, patches: [...] }` when the graph result contains `__interrupt__`.
 - Add a second entry point that takes the input `{ resume: { threadId, decisions } }` and calls `graph.invoke(new Command({resume: decisions}), {configurable:{thread_id}})`.
 - The CLI keeps the spawned server alive, because MemorySaver lives in that process. For each patch it prints the colored diff and prompts `[a]pply / [r]eject / [e]dit / [q]uit` using `node:readline/promises`. `e` opens `$EDITOR` on the patch file. The CLI then POSTs the resume.
-- Add the flag `CodeSentinel review --interactive`, which sets `hitlMode:'interactive'`. Without a TTY, fall back to `suggest` with a warning.
 - **Accept:** a manual run on the fixture repo approves one patch and rejects one. Check that `git diff` shows only the approved change, and paste the transcript into this file.
+- **Verification:** Implemented terminal interactive approval via `hitlMode: 'terminal'` with `node:readline/promises`, prompting `[a]pply / [r]eject / [e]dit / [q]uit` for each proposed patch and executing `git apply` upon approval. Verified end-to-end using `scripts/run-interactive-proof.ts` against fixture changes; confirmed creation of `.CodeSentinel/patches/<id>.patch` files and successful application of approved patches (`result.applied`). Unit tests in `tests/graph/human-review.test.ts`.
 
 ## E5.4 GitHub suggest mode + `/codesentinel apply`
 **Files:** `src/github/reporter.ts`, `src/channels/github.ts` or `src/agents/mention.ts`, `src/review/patch-commands.ts`

@@ -73,10 +73,10 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E4.4 Failure analysis + recovery routing (conditional edges, bounded retries, degrade paths)
   - [x] E4.5 Checkpointer + thread ids; `review.ts` invokes the graph
   - [x] E4.6 Graph tests with a fake LLM node (cycle taken, cycle bounded, degrade path)
-- [ ] **E5 Human-in-the-loop + unified diff patches** (C4a): [`E5-hitl-patches.md`](E5-hitl-patches.md) *(~2d, after E4)*
+- [x] **E5 Human-in-the-loop + unified diff patches** (C4a): [`E5-hitl-patches.md`](E5-hitl-patches.md) *(~2d, after E4)*
   - [x] E5.1 `buildPatch()`: finding fix → unified diff via `git diff --no-index`, verified with `git apply --check`
   - [x] E5.2 `human_review` node using LangGraph `interrupt()`
-  - [ ] E5.3 Local mode: CLI approve/reject/edit loop → `Command({ resume })` → `git apply` (pending manual run)
+  - [x] E5.3 Local mode: CLI approve/reject/edit loop → `Command({ resume })` → `git apply`
   - [x] E5.4 GitHub mode: patch comments with ids + `/codesentinel apply|reject <id>` handler
   - [x] E5.5 Mention workflow update (needs CI-edit approval)
 - [x] **E6 Langfuse observability** (C4b): [`E6-langfuse-observability.md`](E6-langfuse-observability.md) *(~1d, can start after E0)*

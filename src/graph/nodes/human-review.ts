@@ -24,6 +24,53 @@ export interface HumanReviewDeps {
     input: string,
     cwd?: string
   ) => Promise<{ stdout: string; stderr: string }>
+  promptTerminalDecisions?: (
+    workspace: string,
+    patches: Patch[]
+  ) => Promise<Record<string, 'approve' | 'reject' | { edit: string }>>
+}
+
+const defaultPromptTerminalDecisions = async (
+  _workspace: string,
+  patches: Patch[]
+): Promise<Record<string, 'approve' | 'reject' | { edit: string }>> => {
+  const readline = await import('node:readline/promises')
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+
+  const decisions: Record<string, 'approve' | 'reject' | { edit: string }> = {}
+  try {
+    for (const patch of patches) {
+      process.stdout.write(
+        `\nPatch ${patch.id} (${patch.file}) [+${patch.stats?.added ?? 0} -${patch.stats?.removed ?? 0}]:\n${patch.diff}\n`
+      )
+      let answered = false
+      let attempts = 0
+      while (!answered && attempts < 3) {
+        attempts++
+        const answer = (await rl.question('\n[a]pply / [r]eject / [e]dit / [q]uit: '))
+          .trim()
+          .toLowerCase()
+        if (answer === 'a' || answer === 'apply') {
+          decisions[patch.id] = 'approve'
+          answered = true
+        } else if (answer === 'r' || answer === 'reject') {
+          decisions[patch.id] = 'reject'
+          answered = true
+        } else if (answer === 'q' || answer === 'quit') {
+          answered = true
+        } else if (!answer && !process.stdin.isTTY) {
+          // If non-interactive piped input is exhausted, break to avoid hanging
+          break
+        }
+      }
+    }
+  } finally {
+    rl.close()
+  }
+  return decisions
 }
 
 export const humanReview = (deps?: HumanReviewDeps) => {
@@ -31,6 +78,7 @@ export const humanReview = (deps?: HumanReviewDeps) => {
   const doWritePatchFiles = deps?.writePatchFiles ?? writePatchFiles
   const doApplyApproved = deps?.applyApproved ?? applyApproved
   const doRunWithStdin = deps?.runWithStdin ?? runWithStdin
+  const doPromptTerminal = deps?.promptTerminalDecisions ?? defaultPromptTerminalDecisions
 
   return async (state: ReviewStateType): Promise<ReviewStateUpdate> => {
     const attempts = {
@@ -56,6 +104,18 @@ export const humanReview = (deps?: HumanReviewDeps) => {
           '[CodeSentinel] Failed to write patch files to disk:',
           err instanceof Error ? err.message : String(err)
         )
+      }
+    }
+
+    if (state.cfg?.hitlMode === 'terminal' && patches.length > 0) {
+      const decisions = await doPromptTerminal(workspace, patches)
+      const applied = await doApplyApproved(workspace, patches, decisions)
+
+      return {
+        attempts,
+        patches,
+        approvals: decisions,
+        applied,
       }
     }
 

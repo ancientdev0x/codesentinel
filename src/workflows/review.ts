@@ -40,7 +40,7 @@ export const ReviewWorkflowInputSchema = v.object({
   sandbox: v.optional(v.picklist(['docker', 'host', 'auto'])),
   analyzerTimeoutMs: v.optional(v.number()),
   astChecks: v.optional(v.boolean()),
-  hitlMode: v.optional(v.picklist(['off', 'suggest', 'interactive'])),
+  hitlMode: v.optional(v.picklist(['off', 'suggest', 'interactive', 'terminal'])),
   maxAttempts: v.optional(v.number()),
   resume: v.optional(
     v.object({
@@ -240,6 +240,7 @@ export default defineWorkflow({
         findings,
         degraded: finalState.degraded,
         attempts: finalState.attempts,
+        applied: finalState.applied ?? [],
         nodeSequence: finalState.nodeSequence ?? [],
       } as unknown as JsonValue
     } finally {
