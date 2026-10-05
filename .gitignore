@@ -39,3 +39,6 @@ cdk.context.json
 
 # Tool cache
 .commandcode/
+
+# Evaluation results
+eval-results/

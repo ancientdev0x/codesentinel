@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { cp, mkdtemp, rm } from 'node:fs/promises'
+import { chmod, cp, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -19,6 +19,7 @@ export interface TestRepo {
  */
 export const makeRepo = async (): Promise<TestRepo> => {
   const dir = await mkdtemp(join(tmpdir(), 'codesentinel-vuln-repo-'))
+  await chmod(dir, 0o777)
   const fixtureBase = join(__dirname, '../fixtures/vuln-repo/base')
   const fixtureHead = join(__dirname, '../fixtures/vuln-repo/head')
 
@@ -41,6 +42,7 @@ export const makeRepo = async (): Promise<TestRepo> => {
 
   // 3. Apply head version on top
   await cp(fixtureHead, dir, { recursive: true })
+  await execFileAsync('chmod', ['-R', 'a+rX', dir])
   await runGit('add', '.')
   await runGit('commit', '-m', 'head commit with vulnerabilities')
   const { stdout: headShaOut } = await runGit('rev-parse', 'HEAD')
