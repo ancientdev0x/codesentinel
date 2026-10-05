@@ -33,7 +33,7 @@ Usage is recorded with `generation.update({ usageDetails: { input, output, ... }
 
 ---
 
-## E6.1 Bootstrap
+## E6.1 Bootstrap [ ] (pending live run)
 **File:** `src/observability/langfuse.ts`
 ```ts
 let processor: LangfuseSpanProcessor | undefined
@@ -81,7 +81,7 @@ export const traced = <T extends ToolDef>(tool: T): T => ({
 - Apply it to the custom tools: `record_finding`, `triage_finding`, `run_static_analysis`, `suggest_change` (if it is kept), the QA tools, and MCP tools in `src/mcp/connect.ts`.
 - **flue built-in tools** (`read`, `grep`, `bash`, `task`) are not ours to wrap. Read the flue `.d.ts` for an event or hook API (for example session events, `onToolCall`/`onToolResult`, or a stream of events from `session.prompt`). If one exists, open and close an observation per event pair. If none exists, record it under `## Deviations` and trace only the custom tools.
 
-## E6.4 Tokens
+## E6.4 Tokens [ ] (pending live run)
 **File:** `src/graph/nodes/llm-triage.ts`
 - Inspect the return type of `session.prompt()` in `node_modules/@flue/runtime`. It probably has `usage` or `messages[].usage`.
 - Wrap each prompt call in `startObservation('llm', { model: cfg.model, input: truncatedPrompt }, { asType: 'generation' })`.
@@ -101,7 +101,7 @@ Turn "strict" into something you can check:
 4. **Flush guarantee.** A test checks that `flushTracing` runs on both the success and the throw path of `review.ts`.
 
 ## Done when
-- [x] E6.1–E6.6 are ticked.
+- [ ] E6.1–E6.6 are ticked (E6.1, E6.4 pending live run).
 - [x] Strict test coverage and in-memory trace pipeline verification verified in CI suite.
 
 ## Deviations

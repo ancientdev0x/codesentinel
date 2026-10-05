@@ -126,7 +126,7 @@ export const buildReviewGraph = (deps: Deps) => new StateGraph(ReviewState)
 
 ## Done when
 - [x] E4.1–E4.6 are ticked.
-- [x] A real `flue run review` on the fixture repo shows the node sequence in logs, and the sequence includes at least one cycle. Force one by setting `CodeSentinel_ANALYZER_TIMEOUT_MS=1`.
+- [ ] A real `flue run review` on the fixture repo shows the node sequence in logs, and the sequence includes at least one cycle. Force one by setting `CodeSentinel_ANALYZER_TIMEOUT_MS=1`. (pending live run)
 - [x] `docs/ARCHITECTURE.md` contains the generated graph diagram.
 
 ## Deviations

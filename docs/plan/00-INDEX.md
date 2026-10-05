@@ -50,7 +50,7 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
 - [x] **E1 PR URL ingestion** (C1): [`E1-pr-url-ingestion.md`](E1-pr-url-ingestion.md) *(~1d)*
   - [x] E1.1 `parsePrUrl()` + tests
   - [x] E1.2 `src/review/source.ts`: fetch PR meta, shallow-fetch head/base into a temp worktree
-  - [x] E1.3 CLI `CodeSentinel review --pr <url>` and payload `prUrl`
+  - [ ] E1.3 CLI `CodeSentinel review --pr <url>` and payload `prUrl` (pending live run)
   - [x] E1.4 Make the reporter target the URL's PR (post comments there when a token is available)
 - [x] **E2 AST fragment extraction + AST checks** (C1): [`E2-ast-extraction.md`](E2-ast-extraction.md) *(~1.5d)*
   - [x] E2.1 `@ast-grep/napi` + Python language registration; `src/review/ast/parse.ts`
@@ -80,10 +80,10 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [ ] E5.4 GitHub mode: patch comments with ids + `/codesentinel apply|reject <id>` handler
   - [ ] E5.5 Mention workflow update (needs CI-edit approval)
 - [x] **E6 Langfuse observability** (C4b): [`E6-langfuse-observability.md`](E6-langfuse-observability.md) *(~1d, can start after E0)*
-  - [x] E6.1 OTel + `LangfuseSpanProcessor` bootstrap, env-gated, flush on exit
+  - [ ] E6.1 OTel + `LangfuseSpanProcessor` bootstrap, env-gated, flush on exit (pending live run)
   - [x] E6.2 Trace per review; span per graph node
   - [x] E6.3 `traced()` wrapper on every tool → per-tool latency + error level
-  - [x] E6.4 Generation observations with token `usageDetails` from flue
+  - [ ] E6.4 Generation observations with token `usageDetails` from flue (pending live run)
   - [x] E6.5 Subprocess spans (bandit/ruff/docker) with duration, exit, timeout flag
   - [x] E6.6 Strictness: schema-validated metadata, CI test that fails if a tool is unwrapped
 - [ ] **E7 Evaluation + metrics** (makes "identifying vulnerabilities" provable): [`E7-eval-and-metrics.md`](E7-eval-and-metrics.md) *(~1d, last)*
