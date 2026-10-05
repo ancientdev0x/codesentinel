@@ -130,7 +130,7 @@ export const runStaticAnalysis = async (
         const val = res.value
         allFindings.push(...val.findings)
         if (val.runResult) {
-          runs.push(val.runResult)
+          runs.push({ ...val.runResult, tool: val.tool })
           reports.push({
             tool: val.tool,
             backend: val.backend,

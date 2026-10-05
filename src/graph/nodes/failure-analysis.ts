@@ -66,6 +66,21 @@ export const failureAnalysis = async (
         degraded.push(err.tool)
       }
     }
+
+    // Fix degraded tracking: when an analyzer stage ends with all tools timed out / unavailable,
+    // record the static_analysis stage itself as degraded.
+    const successfulReports = (state.analyzerReports ?? []).filter(
+      (r) => r.status === 'ok'
+    )
+    const hasAttemptedTools =
+      staticErrors.length > 0 || (state.analyzerReports ?? []).length > 0
+    if (
+      successfulReports.length === 0 &&
+      hasAttemptedTools &&
+      !degraded.includes('static_analysis')
+    ) {
+      degraded.push('static_analysis')
+    }
   }
 
   // 2. Check validation and llm_triage errors

@@ -218,6 +218,7 @@ export default defineWorkflow({
         findings,
         degraded: finalState.degraded,
         attempts: finalState.attempts,
+        nodeSequence: finalState.nodeSequence ?? [],
       } as unknown as JsonValue
     } finally {
       deleteCollector(runId)

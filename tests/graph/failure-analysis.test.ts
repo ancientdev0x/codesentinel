@@ -168,4 +168,84 @@ describe('failureAnalysis deterministic error classification & recovery (E4.4)',
     expect(update.recovery?.retry).toBe('llm_triage')
     expect(update.recovery?.hints[0]).toContain('Review summary was empty')
   })
+
+  it('records static_analysis as degraded when all tools in analyzer stage time out or fail', async () => {
+    const state = createState({
+      attempts: { static_analysis: 2 },
+      analyzerReports: [
+        {
+          tool: 'bandit',
+          backend: 'docker',
+          status: 'timeout',
+          findings: 0,
+          durationMs: 5000,
+        },
+        {
+          tool: 'ruff',
+          backend: 'docker',
+          status: 'timeout',
+          findings: 0,
+          durationMs: 5000,
+        },
+        {
+          tool: 'tsc',
+          backend: 'host',
+          status: 'timeout',
+          findings: 0,
+          durationMs: 5000,
+        },
+      ],
+      errors: [
+        {
+          stage: 'static_analysis',
+          kind: 'timeout',
+          tool: 'bandit',
+          detail: 'Bandit timeout',
+        },
+        {
+          stage: 'static_analysis',
+          kind: 'timeout',
+          tool: 'ruff',
+          detail: 'Ruff timeout',
+        },
+        { stage: 'static_analysis', kind: 'timeout', tool: 'tsc', detail: 'tsc timeout' },
+      ],
+    })
+
+    const update = await failureAnalysis(state)
+    expect(update.recovery?.retry).toBeNull()
+    expect(update.degraded).toContain('bandit')
+    expect(update.degraded).toContain('ruff')
+    expect(update.degraded).toContain('tsc')
+    expect(update.degraded).toContain('static_analysis')
+  })
+
+  it('does NOT record static_analysis as degraded if at least one tool succeeded', async () => {
+    const state = createState({
+      attempts: { static_analysis: 2 },
+      analyzerReports: [
+        {
+          tool: 'bandit',
+          backend: 'docker',
+          status: 'timeout',
+          findings: 0,
+          durationMs: 5000,
+        },
+        { tool: 'ruff', backend: 'docker', status: 'ok', findings: 2, durationMs: 120 },
+      ],
+      errors: [
+        {
+          stage: 'static_analysis',
+          kind: 'timeout',
+          tool: 'bandit',
+          detail: 'Bandit timeout',
+        },
+      ],
+    })
+
+    const update = await failureAnalysis(state)
+    expect(update.recovery?.retry).toBeNull()
+    expect(update.degraded).toContain('bandit')
+    expect(update.degraded).not.toContain('static_analysis')
+  })
 })

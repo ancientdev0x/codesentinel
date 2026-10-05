@@ -71,10 +71,7 @@ export const buildReviewGraph = (deps: ReviewGraphDeps = {}) => {
       if (retry === 'static_analysis') return 'static_analysis'
       if (retry === 'llm_triage') return 'llm_triage'
       // If recovery retry is null or non-retryable error, advance pipeline
-      if (
-        (s.attempts?.llm_triage ?? 0) === 0 &&
-        !s.degraded.includes('static_analysis')
-      ) {
+      if ((s.attempts?.llm_triage ?? 0) === 0 && !s.degraded.includes('llm_triage')) {
         return 'llm_triage'
       }
       return 'human_review'

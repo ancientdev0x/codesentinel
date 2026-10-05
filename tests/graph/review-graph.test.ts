@@ -74,6 +74,15 @@ describe('buildReviewGraph cycle and self-correction engine (E4.5, E4.6)', () =>
     expect(finalState.attempts.report).toBe(1)
     expect(finalState.llmFindings).toHaveLength(1)
     expect(finalState.summary).toContain('Happy path review complete.')
+    expect(finalState.nodeSequence).toEqual([
+      'ingest',
+      'extract_ast',
+      'static_analysis',
+      'llm_triage',
+      'validate',
+      'human_review',
+      'report',
+    ])
 
     deleteCollector(runId)
   })
@@ -153,6 +162,18 @@ describe('buildReviewGraph cycle and self-correction engine (E4.5, E4.6)', () =>
     expect(receivedHint).toContain('changed lines are 1-1')
     expect(finalState.llmFindings).toHaveLength(1)
     expect(finalState.llmFindings[0].startLine).toBe(1)
+    expect(finalState.nodeSequence).toEqual([
+      'ingest',
+      'extract_ast',
+      'static_analysis',
+      'llm_triage',
+      'validate',
+      'failure_analysis',
+      'llm_triage',
+      'validate',
+      'human_review',
+      'report',
+    ])
 
     deleteCollector(runId)
   })

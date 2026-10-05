@@ -115,6 +115,16 @@ export const withNodeSpan = <
         span.update({
           output: summarizeDelta(out),
         })
+        if (
+          out &&
+          typeof out === 'object' &&
+          ('cfg' in state || 'nodeSequence' in state)
+        ) {
+          return {
+            ...out,
+            nodeSequence: [name],
+          }
+        }
         return out
       } catch (err) {
         span.update({

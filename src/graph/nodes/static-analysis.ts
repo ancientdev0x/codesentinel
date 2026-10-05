@@ -46,25 +46,28 @@ export const staticAnalysis = (deps: StaticAnalysisDeps = {}) => {
 
       const errors: StageError[] = []
       for (const run of result.runs) {
+        const runTool = (run as { tool?: string }).tool
         if (run.status === 'timeout') {
           const timeout = adjustedCfg.analyzerTimeoutMs ?? 5000
           errors.push({
             stage: 'static_analysis',
             kind: 'timeout',
-            tool: (run as { tool?: string }).tool,
-            detail: `Analyzer ${(run as { tool?: string }).tool ?? 'tool'} timed out after ${timeout}ms`,
+            tool: runTool,
+            detail: `Analyzer ${runTool ?? 'tool'} timed out after ${timeout}ms`,
           })
-        } else if (run.status === 'error') {
+        } else if (run.status === 'error' || run.status === 'unavailable') {
           const isDocker =
             adjustedCfg.sandbox === 'docker' ||
-            (run as { stderr?: string }).stderr?.toLowerCase().includes('docker')
+            ((run as { stderr?: string }).stderr?.toLowerCase().includes('docker') ??
+              false)
           errors.push({
             stage: 'static_analysis',
             kind: isDocker ? 'unavailable' : 'crash',
-            tool: (run as { tool?: string }).tool,
+            tool: runTool,
             detail:
               (run as { stderr?: string }).stderr ||
-              `Analyzer ${(run as { tool?: string }).tool ?? 'tool'} failed with status error`,
+              (run as { reason?: string }).reason ||
+              `Analyzer ${runTool ?? 'tool'} failed with status ${run.status}`,
           })
         }
       }

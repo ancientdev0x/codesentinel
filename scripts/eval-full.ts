@@ -384,8 +384,11 @@ export const runSingleLiveEval = async (
   // Score findings against labels
   const scored = scoreFindings(confirmedFindings, labels)
 
-  // Extract node sequence from logs or attempts
-  const nodeSequence: string[] = Object.keys(attempts)
+  // Extract real ordered node sequence with cycles preserved
+  const nodeSequence: string[] =
+    Array.isArray(workflowResult.nodeSequence) && workflowResult.nodeSequence.length > 0
+      ? workflowResult.nodeSequence
+      : Object.keys(attempts)
 
   const selfCorrectionTriggered =
     (attempts['llm_triage'] ?? 0) > 1 || (attempts['static_analysis'] ?? 0) > 1

@@ -40,6 +40,9 @@ export interface RecoveryPlan {
 export const errorsReducer = (a: StageError[] = [], b: StageError[] = []): StageError[] =>
   a.concat(b)
 
+export const nodeSequenceReducer = (a: string[] = [], b: string[] = []): string[] =>
+  a.concat(b)
+
 export const ReviewState = new StateSchema({
   cfg: z.custom<ReviewConfig>(),
   files: z.array(z.custom<ReviewFileWithDiff>()).default([]),
@@ -50,6 +53,13 @@ export const ReviewState = new StateSchema({
   summary: z.string().default(''),
   summaryUrl: z.string().nullable().default(null),
   attempts: z.record(z.string(), z.number()).default({}), // per node: { llm_triage: 1, static_analysis: 0 }
+  nodeSequence: new ReducedValue(
+    z.array(z.string()).default(() => []),
+    {
+      inputSchema: z.array(z.string()),
+      reducer: nodeSequenceReducer,
+    }
+  ),
   errors: new ReducedValue(
     z.array(z.custom<StageError>()).default(() => []),
     {

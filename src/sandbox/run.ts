@@ -13,11 +13,12 @@ export interface RunSpec {
   okExitCodes?: number[] // bandit/ruff exit 1 = "findings", not failure
 }
 
-export type RunResult =
+export type RunResult = (
   | { status: 'ok'; exitCode: number; stdout: string; stderr: string; durationMs: number }
   | { status: 'timeout'; durationMs: number }
   | { status: 'unavailable'; reason: string } // ENOENT / image missing
   | { status: 'error'; exitCode: number | null; stderr: string; durationMs: number }
+) & { tool?: string }
 
 const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024 // 10 MiB
 
