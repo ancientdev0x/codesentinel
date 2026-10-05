@@ -147,7 +147,7 @@
   },
   {
     "file": "web/permission.ts",
-    "line": 2,
+    "line": 5,
     "cwe": "CWE-285",
     "kind": "regression",
     "detector": "llm"

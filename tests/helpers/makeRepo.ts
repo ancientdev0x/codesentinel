@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { chmod, cp, mkdtemp, rm } from 'node:fs/promises'
+import { chmod, cp, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -25,6 +25,11 @@ export const makeRepo = async (): Promise<TestRepo> => {
 
   // 1. Copy base version
   await cp(fixtureBase, dir, { recursive: true })
+  // Minimal ambient declaration to fix TS2307/TS2305 on node:child_process in fixture environment
+  await writeFile(
+    join(dir, 'web', 'ambient.d.ts'),
+    "declare module 'node:child_process' {\n  export function exec(cmd: string, cb?: (err: Error | null, stdout: string) => void): void\n  export function execSync(cmd: string, options?: any): string\n}\n"
+  )
 
   const runGit = async (...args: string[]) => {
     return execFileAsync('git', args, { cwd: dir })

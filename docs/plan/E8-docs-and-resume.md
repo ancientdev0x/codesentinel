@@ -20,8 +20,8 @@ Fill this in only from the evidence. Each phrase must map to a row in the `00-IN
 
 > **CodeSentinel — Autonomous DevSecOps Review Agent** | TypeScript, LangGraph, Docker, Langfuse
 > - Built multi-stage review pipelines ingesting git diffs and PR URLs, using ast-grep to extract changed functions/classes and run 7 AST security rules across Python and TypeScript.
-> - Integrated Bandit and Ruff in network-less, read-only Docker sandboxes with hard timeouts; detected 21/21 seeded vulnerabilities and regressions at 100% precision after LLM triage.
-> - Architected a LangGraph cyclic state engine that orchestrates tool execution, classifies stage failures, and self-corrects via bounded retries (recovered 100% of invalid-output runs).
+> - Integrated Bandit and Ruff in network-less, read-only Docker sandboxes with hard timeouts; detected seeded vulnerabilities and regressions at 97.6% average recall and 100% precision after LLM triage.
+> - Architected a LangGraph cyclic state engine that orchestrates tool execution, classifies stage failures, and self-corrects via bounded retries (tested failure recovery under forced tool timeouts).
 > - Implemented human-in-the-loop patch approval (LangGraph interrupts + `/codesentinel apply` PR commands) generating `git apply`-verified unified diffs; traced per-tool latency and token usage in Langfuse.
 
 Checklist before using it:

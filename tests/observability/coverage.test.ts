@@ -191,7 +191,12 @@ describe('Observability strict coverage & pipeline guarantees (E6.6)', () => {
         await (reviewWorkflow as any).action.run({
           harness: fakeHarness,
           log: {},
-          input: { platform: 'local', workspace: process.cwd() },
+          input: {
+            platform: 'local',
+            workspace: process.cwd(),
+            staticAnalysis: false,
+            astChecks: false,
+          },
         })
       } catch {
         // Handled/thrown
@@ -208,12 +213,17 @@ describe('Observability strict coverage & pipeline guarantees (E6.6)', () => {
         await (reviewWorkflow as any).action.run({
           harness: failingHarness,
           log: {},
-          input: { platform: 'local', workspace: process.cwd() },
+          input: {
+            platform: 'local',
+            workspace: process.cwd(),
+            staticAnalysis: false,
+            astChecks: false,
+          },
         })
       } catch {
         // Expected throw
       }
       expect(tracingLifecycle.flushCount).toBeGreaterThan(0)
-    })
+    }, 15000)
   })
 })

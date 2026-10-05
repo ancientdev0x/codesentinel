@@ -41,4 +41,5 @@ cdk.context.json
 .commandcode/
 
 # Evaluation results
-eval-results/
+eval-results/*
+!eval-results/*.json

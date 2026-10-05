@@ -77,16 +77,17 @@ Run `CodeSentinel review --pr <url>` (E1) on 3–5 real public Python PRs that l
 - Clean file findings: **0** (100% specificity on clean control files).
 - Union recall: **100%** (18/18 deterministic vulnerabilities caught, exceeding the 90% threshold).
 
-### E7.3 Full-Pipeline Evaluation (`docs/EVAL.md`, `scripts/eval-full.ts`, `tests/eval/full-pipeline.test.ts`)
+### E7.3 Full-Pipeline Evaluation (`docs/EVAL.md`, `scripts/eval-full.ts`, `tests/eval/full-pipeline-aggregation.test.ts`)
 - Script: `scripts/eval-full.ts` with gating on `EVAL_FULL=1`.
-- Tests: `tests/eval/full-pipeline.test.ts` asserts metric calculations, precision/recall computation, triage dismissal calculation, self-correction tracking, and patch quality verification.
+- Tests: `tests/eval/full-pipeline-aggregation.test.ts` (aggregation unit test) and `tests/eval/live-full-pipeline.test.ts` (live runner).
+- Raw JSON evidence: `eval-results/full-run-1.json`, `eval-results/full-run-2.json`, `eval-results/full-pipeline-summary.json`.
 - Output benchmark report generated and documented in `docs/EVAL.md`.
-- Full pipeline results on `openai-codex/gpt-5.6-luna`:
-  - 100% recall on seeded vulnerabilities (21/21)
-  - 100% precision with 0 false positives on clean control files
-  - 3/3 subtle logic regressions caught (inverted auth check, dropped input sanitization, inverted permission role check)
-  - 100% self-correcting recovery rate across both validation retries and subprocess timeout retries
-  - 100% patch quality rate verified with `git apply --check`
-  - p50 review latency: 52.4s, p95: 74.1s.
+- Full pipeline empirical results on `openai-codex/gpt-5.6-luna`:
+  - 97.6% average recall on seeded defects (Run 1: 20/21 = 95.2%, Run 2: 21/21 = 100.0%)
+  - 100.0% precision with 0 false positives on clean control files
+  - Logic regressions: 2/3 caught in Run 1 (missed `data_validator.py`), 3/3 caught in Run 2 (5/6 total, 83.3% across runs)
+  - Cyclic recovery: verified in Run 2 via forced timeout (`failure_analysis` cycle)
+  - 100% patch quality on generated patches verified with `git apply --check` (21/21 passed in Run 1)
+  - Latency: Run 1 89.8s, Run 2 145.7s (p50: 89.8s, p95: 145.7s).
 
 

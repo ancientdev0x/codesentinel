@@ -24,7 +24,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "vitest run tests/eval/deterministic.test.ts",
-    "eval:full": "vitest run tests/eval/full-pipeline.test.ts",
+    "eval:full": "vitest run tests/eval/live-full-pipeline.test.ts",
     "check": "oxlint && oxfmt --check",
     "check:types": "tsc --noEmit",
     "check:fix": "oxlint --fix && oxfmt",
