@@ -18,11 +18,18 @@
 ## E8.2 Resume wording
 Fill this in only from the evidence. Each phrase must map to a row in the `00-INDEX.md` coverage table, and every number must come from `docs/EVAL.md`.
 
-> **CodeSentinel — Autonomous DevSecOps Review Agent** | TypeScript, LangGraph, Docker, Langfuse
-> - Built multi-stage review pipelines ingesting git diffs and PR URLs, using ast-grep to extract changed functions/classes and run 7 AST security rules across Python and TypeScript.
-> - Integrated Bandit and Ruff in network-less, read-only Docker sandboxes with hard timeouts; detected 18/18 deterministic vulnerabilities at 100% union recall with 0 false positives.
-> - Evaluated full-pipeline review across 2 runs on a 25-label seeded benchmark: achieved 95–100% recall (97.6% avg) at 100% precision after LLM triage, catching 5 of 6 subtle logic regressions at ~90s per review.
-> - Implemented human-in-the-loop patch approval (LangGraph interrupts + `/codesentinel apply` PR commands) generating `git apply`-verified unified diffs; traced per-tool latency and token usage in Langfuse.
+CodeSentinel — Autonomous DevSecOps Review Agent | TypeScript, LangGraph, Docker, Langfuse
+• Built a multi-stage review pipeline over git diffs and PR URLs, using ast-grep to
+  extract changed functions/classes and run 12 AST security rules across Python and
+  TypeScript.
+• Ran Bandit and Ruff in network-less, read-only Docker sandboxes with hard timeouts;
+  100% union recall (18/18) with 0 false positives on a seeded benchmark.
+• Orchestrated a cyclic LangGraph state engine that retries and gracefully degrades
+  failed stages; across 3 live runs on a 25-label benchmark, LLM triage reached 95–100%
+  recall at 100% precision and caught 7/9 subtle logic regressions (~90s median per review).
+• Added human-in-the-loop patch approval (LangGraph interrupts + /codesentinel apply PR
+  commands) producing git-apply-verified diffs, with OpenTelemetry/Langfuse tracing of
+  tool latency and tokens.
 
 Checklist before using it:
 - [x] Every number is in `docs/EVAL.md` with a commit SHA.

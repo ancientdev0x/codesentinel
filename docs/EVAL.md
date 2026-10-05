@@ -52,24 +52,24 @@ The full pipeline executes the LangGraph cyclic review workflow:
 
 Source data: `eval-results/full-run-1.json` (Run 1: standard review), `eval-results/full-run-2.json` (Run 2: forced timeout cycle), and `eval-results/full-run-3.json` (Run 3: forced timeout cycle with corrected node sequence and degraded tracking).
 
-| Metric | Run 1 (Standard Review) | Run 2 (Forced Timeout Cycle) | Run 3 (Forced Timeout + Corrected Tracking) | 2-Run Benchmark Summary (Runs 1 & 2) |
+| Metric | Run 1 (Standard Review) | Run 2 (Forced Timeout Cycle) | Run 3 (Forced Timeout + Corrected Tracking) | 3-Run Benchmark Summary (Runs 1, 2 & 3) |
 |---|---|---|---|---|
-| **True Positives (TP)** | 20 / 21 | 21 / 21 | 20 / 21 | **95–100% recall (20.5 / 21, 97.6% avg)** |
+| **True Positives (TP)** | 20 / 21 | 21 / 21 | 20 / 21 | **95–100% recall (20.3 / 21, 96.8% avg)** |
 | **False Positives (FP)** | 0 | 0 | 0 | **0 (100.0% precision)** |
-| **Duplicate Detections** | 23 | 15 | 16 | **19 avg** |
-| **Total Confirmed Findings** | 43 | 36 | 36 | **39.5 avg** |
-| **False Negatives (FN)** | 1 | 0 | 1 | **0.5 avg** |
+| **Duplicate Detections** | 23 | 15 | 16 | **18 avg** |
+| **Total Confirmed Findings** | 43 | 36 | 36 | **38.3 avg** |
+| **False Negatives (FN)** | 1 | 0 | 1 | **0.7 avg** |
 | **Precision** | 100.0% | 100.0% | 100.0% | **100.0%** |
-| **Recall** | 95.2% (20/21) | 100.0% (21/21) | 95.2% (20/21) | **95–100% recall (97.6% avg)** |
-| **Subtle Logic Regressions** | 2 / 3 caught (missed `data_validator.py`) | 3 / 3 caught | 2 / 3 caught (missed `data_validator.py`) | **5 of 6 caught across 2 runs (83.3%)** |
+| **Recall** | 95.2% (20/21) | 100.0% (21/21) | 95.2% (20/21) | **95–100% recall (96.8% avg: 20/21, 21/21, 20/21)** |
+| **Subtle Logic Regressions** | 2 / 3 caught (missed `data_validator.py`) | 3 / 3 caught | 2 / 3 caught (missed `data_validator.py`) | **7 of 9 caught across 3 runs (77.8%)** |
 | **Clean Control False Positives**| 0 | 0 | 0 | **0% FP rate** |
-| **Self-Correction Triggered** | No (all attempt 1) | Yes (`failure_analysis` cycle) | Yes (`failure_analysis` cycle) | **50% triggered (1 of 2 benchmark runs)** |
+| **Self-Correction Triggered** | No (all attempt 1) | Yes (`failure_analysis` cycle) | Yes (`failure_analysis` cycle) | **66.7% triggered (2 of 3 benchmark runs)** |
 | **Self-Correction Recovered** | N/A | **False** (exhausted attempts, degraded) | **False** (exhausted attempts, degraded) | **0% (not a successful recovery)** |
 | **Real Node Sequence** | ingest → extract_ast → static_analysis → llm_triage → validate → human_review → report | Deduplicated in old recorder | ingest → extract_ast → static_analysis → failure_analysis → static_analysis → failure_analysis → llm_triage → validate → human_review → report | Cycles and retry loops visible |
 | **Degraded Stages** | 0 (`[]`) | 1 (`['llm_triage']`) | 4 (`['bandit', 'ruff', 'tsc', 'static_analysis']`) | Degraded stage tracking verified |
 | **Patch Validity (`git apply --check`)** | 21 / 21 (100% valid diffs) | 0 generated | 0 generated | **100% of generated patches valid** |
 | **Tokens (Total)** | 35,559 | 355,805 | 56,039 | Measured via OTel generation tokens |
-| **Wall Clock Latency** | 89.8s (89,775 ms) | 145.7s (145,660 ms) | 74.9s (74,938 ms) | **About 90s per review (89.8s standard review)** |
+| **Wall Clock Latency** | 89.8s (89,775 ms) | 145.7s (145,660 ms) | 74.9s (74,938 ms) | **89.8s median (89.8s / 145.7s / 74.9s, ~90s median per review)** |
 
 ---
 
@@ -86,12 +86,12 @@ Static analyzers cannot detect business logic regressions that contain valid syn
 2. `web/permission.ts:5`: Inverted role guard in TypeScript permission handler (`if (user.role !== 'admin') return true`) — **caught** in all runs.
 3. `app/data_validator.py:2`: Dropped input sanitization call before database persistence — missed in Run 1 and Run 3, **caught in Run 2**.
 
-Across the 2 benchmark runs (Runs 1 & 2), 5 out of 6 logic regression opportunities were successfully detected (83.3% recall on subtle logic bugs).
+Across the 3 live benchmark runs (Runs 1, 2 & 3), 7 out of 9 logic regression opportunities were successfully detected (Run 1: 2/3, Run 2: 3/3, Run 3: 2/3).
 
 ### Execution Under Timeout (Honest Self-Correction Account)
-- In Run 2, `CodeSentinel_ANALYZER_TIMEOUT_MS=1` forced tool timeouts.
+- In Run 2 and Run 3, `CodeSentinel_ANALYZER_TIMEOUT_MS=1` forced tool timeouts.
 - **Run 2 Result:** Timeout forced; static analysis degraded, LLM triage exhausted 3 attempts and degraded; review still completed with 21/21 via LLM. This is **not a successful recovery** (`selfCorrection.recovered = false`).
-- **Run 3 Result:** Demonstrates corrected real sequence logging with cycles (`ingest` → `extract_ast` → `static_analysis` → `failure_analysis` → `static_analysis` → `failure_analysis` → `llm_triage` → `validate` → `human_review` → `report`) and complete degraded tracking (`['bandit', 'ruff', 'tsc', 'static_analysis']`).
+- **Run 3 Result:** Demonstrates corrected real sequence logging with cycles (`ingest` → `extract_ast` → `static_analysis` → `failure_analysis` → `static_analysis` → `failure_analysis` → `llm_triage` → `validate` → `human_review` → `report`) and complete degraded tracking (`['bandit', 'ruff', 'tsc', 'static_analysis']`). Review completed with 20/21 via LLM. Not a successful recovery (`selfCorrection.recovered = false`).
 
 ### Patch Generation & Quality
 - Generated patches are written to `.CodeSentinel/patches/<id>.patch`.
