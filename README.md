@@ -175,14 +175,15 @@ export LANGFUSE_BASEURL="https://cloud.langfuse.com"
 
 ## Evaluation & Benchmarks 📊
 
-CodeSentinel is rigorously evaluated against a 25-item ground-truth benchmark suite (`tests/fixtures/vuln-repo.labels.json`) covering 7 CWE categories, subtle business logic regressions, and clean control files.
+CodeSentinel is rigorously evaluated against a 25-item ground-truth benchmark suite (`tests/fixtures/vuln-repo.labels.json`) covering 7 CWE categories, subtle business logic regressions, and clean control files across 2 live benchmark runs.
 
-- **Deterministic Union Recall:** **100.0% (18/18)**
-- **Full Pipeline Recall (with LLM Triage):** **97.6% (Run 1: 95.2%, Run 2: 100.0%)**
-- **False Positives on Clean Controls:** **0 (0.0% FP rate, 100.0% precision)**
-- **Self-Correction Recovery:** **Cyclic recovery verified on analyzer timeouts (`failure_analysis`)**
+- **Deterministic Union Recall:** **100.0% (18/18, 0 false positives)**
+- **Full Pipeline Recall (with LLM Triage):** **95–100% recall (97.6% avg: Run 1: 95.2%, Run 2: 100.0%)**
+- **Precision:** **100.0% (0 false positives on clean control files)**
+- **Subtle Logic Regressions:** **5 of 6 logic-regression catches across 2 runs (83.3%)**
+- **Review Latency:** **About 90s per review (Run 1: 89.8s)**
+- **Self-Correction & Timeout Handling:** **Analyzer timeouts trigger failure analysis and cyclic retries; degraded states gracefully tracked**
 - **Patch Application Quality:** **100.0% pass `git apply --check` (21/21 in Run 1)**
-- **p50 Review Latency:** **89.8s (Run 1: 89.8s, Run 2: 145.7s)**
 
 See the complete benchmark data and methodology in [**docs/EVAL.md**](docs/EVAL.md).
 

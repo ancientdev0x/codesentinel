@@ -83,11 +83,12 @@ Run `CodeSentinel review --pr <url>` (E1) on 3–5 real public Python PRs that l
 - Raw JSON evidence: `eval-results/full-run-1.json`, `eval-results/full-run-2.json`, `eval-results/full-pipeline-summary.json`.
 - Output benchmark report generated and documented in `docs/EVAL.md`.
 - Full pipeline empirical results on `openai-codex/gpt-5.6-luna`:
-  - 97.6% average recall on seeded defects (Run 1: 20/21 = 95.2%, Run 2: 21/21 = 100.0%)
-  - 100.0% precision with 0 false positives on clean control files
-  - Logic regressions: 2/3 caught in Run 1 (missed `data_validator.py`), 3/3 caught in Run 2 (5/6 total, 83.3% across runs)
-  - Cyclic recovery: verified in Run 2 via forced timeout (`failure_analysis` cycle)
-  - 100% patch quality on generated patches verified with `git apply --check` (21/21 passed in Run 1)
-  - Latency: Run 1 89.8s, Run 2 145.7s (p50: 89.8s, p95: 145.7s).
+  - 100% union recall from deterministic detectors (18/18), 0 false positives
+  - Full pipeline: 95–100% recall (Run 1: 95.2%, Run 2: 100.0%) and 100% precision on a 25-label benchmark across 2 runs
+  - 5 of 6 logic-regression catches across 2 runs (83.3%)
+  - Latency: about 90s per standard review (Run 1: 89.8s)
+  - Run 2: timeout forced; static analysis degraded, LLM triage exhausted 3 attempts and degraded; review still completed with 21/21 via LLM (not a successful recovery)
+  - Run 3: verified corrected real node sequence with repeats (`ingest` → `extract_ast` → `static_analysis` → `failure_analysis` → `static_analysis` → `failure_analysis` → `llm_triage` → `validate` → `human_review` → `report`) and complete degraded tracking (`['bandit', 'ruff', 'tsc', 'static_analysis']`).
+  - 100% patch quality on generated patches verified with `git apply --check` (21/21 passed in Run 1).
 
 
