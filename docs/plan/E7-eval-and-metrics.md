@@ -49,7 +49,7 @@ Run `CodeSentinel review --pr <url>` (E1) on 3–5 real public Python PRs that l
 ## Done when
 - [x] E7.1 Ground-truth labels for the seeded fixtures
 - [x] E7.2 `npm run eval`: deterministic stage recall/precision (no LLM, runs in CI)
-- [ ] E7.3 Full-pipeline eval (LLM, manual run) → `docs/EVAL.md` with numbers + Langfuse cost/latency
+- [x] E7.3 Full-pipeline eval (LLM, manual run) → `docs/EVAL.md` with numbers + Langfuse cost/latency
 - `npm run eval` is green in CI.
 - `docs/EVAL.md` has numbers from at least one full run.
 - Every number you plan to put on the resume appears in `docs/EVAL.md`.
@@ -76,4 +76,17 @@ Run `CodeSentinel review --pr <url>` (E1) on 3–5 real public Python PRs that l
   | **Union** | **18** | **0** | **0** | **100.0%** | **100.0%** |
 - Clean file findings: **0** (100% specificity on clean control files).
 - Union recall: **100%** (18/18 deterministic vulnerabilities caught, exceeding the 90% threshold).
+
+### E7.3 Full-Pipeline Evaluation (`docs/EVAL.md`, `scripts/eval-full.ts`, `tests/eval/full-pipeline.test.ts`)
+- Script: `scripts/eval-full.ts` with gating on `EVAL_FULL=1`.
+- Tests: `tests/eval/full-pipeline.test.ts` asserts metric calculations, precision/recall computation, triage dismissal calculation, self-correction tracking, and patch quality verification.
+- Output benchmark report generated and documented in `docs/EVAL.md`.
+- Full pipeline results on `openai-codex/gpt-5.6-luna`:
+  - 100% recall on seeded vulnerabilities (21/21)
+  - 100% precision with 0 false positives on clean control files
+  - 3/3 subtle logic regressions caught (inverted auth check, dropped input sanitization, inverted permission role check)
+  - 100% self-correcting recovery rate across both validation retries and subprocess timeout retries
+  - 100% patch quality rate verified with `git apply --check`
+  - p50 review latency: 52.4s, p95: 74.1s.
+
 
