@@ -1,5 +1,5 @@
 import { createReporter } from '../../github/reporter'
-import { dedupeFindings, normalizeFinding } from '../../review/findings'
+import { dedupeFindings, normalizeFinding, type Finding } from '../../review/findings'
 import { getRejectedIds } from '../../review/patch-commands'
 import type { ReviewStateType, ReviewStateUpdate } from '../state'
 
@@ -49,40 +49,108 @@ export const report = (deps: ReportDeps = {}) => {
       ...unconfirmedStatic,
     ]).map((f) => normalizeFinding(f, state.cfg?.workspace))
 
-    // Post inline review comments for all reportable findings
+    // Group findings by file and overlapping line ranges to post exactly ONE comment per location
+    const findingsByFile = new Map<string, Finding[]>()
     for (const finding of allFindings) {
-      let body = `**[${finding.severity.toUpperCase()}]** ${finding.message}`
-      if (finding.cwe) {
-        body += ` (${finding.cwe})`
+      const list = findingsByFile.get(finding.file) ?? []
+      list.push(finding)
+      findingsByFile.set(finding.file, list)
+    }
+
+    const findingGroups: Finding[][] = []
+    for (const [_file, fileFindings] of findingsByFile) {
+      const sorted = [...fileFindings].sort(
+        (a, b) => a.startLine - b.startLine || a.endLine - b.endLine
+      )
+      let currentGroup: Finding[] = []
+      let groupEnd = -1
+
+      for (const finding of sorted) {
+        if (currentGroup.length === 0) {
+          currentGroup = [finding]
+          groupEnd = finding.endLine
+        } else if (finding.startLine <= groupEnd) {
+          currentGroup.push(finding)
+          groupEnd = Math.max(groupEnd, finding.endLine)
+        } else {
+          findingGroups.push(currentGroup)
+          currentGroup = [finding]
+          groupEnd = finding.endLine
+        }
       }
-      if (finding.rationale) {
-        body += `\n\n*Rationale:* ${finding.rationale}`
+      if (currentGroup.length > 0) {
+        findingGroups.push(currentGroup)
       }
-      if (finding.fix) {
-        body += `\n\n\`\`\`suggestion\n${finding.fix.replacement}\n\`\`\``
+    }
+
+    for (const group of findingGroups) {
+      // Prefer LLM finding if present, otherwise highest severity
+      const llmFinding = group.find((f) => f.source === 'llm')
+      const primary =
+        llmFinding ??
+        [...group].sort(
+          (a, b) =>
+            (SEVERITY_RANK[b.severity?.toLowerCase()] ?? 0) -
+            (SEVERITY_RANK[a.severity?.toLowerCase()] ?? 0)
+        )[0]
+
+      let body = `**[${primary.severity.toUpperCase()}]** ${primary.message}`
+      if (primary.cwe) {
+        body += ` (${primary.cwe})`
+      }
+      if (primary.rationale) {
+        body += `\n\n*Rationale:* ${primary.rationale}`
+      }
+
+      // Collect detector sources/rules that found it
+      const detectors: string[] = []
+      for (const f of group) {
+        if (f.source !== 'llm') {
+          detectors.push(`${f.source} ${f.ruleId}`)
+        }
+      }
+      const uniqueDetectors = [...new Set(detectors)]
+      if (uniqueDetectors.length > 0) {
+        const isConfirmed = group.some(
+          (f) => f.status === 'confirmed' || f.source === 'llm'
+        )
+        body += `\n\nDetected by: ${uniqueDetectors.join(', ')}${isConfirmed ? ' · LLM confirmed' : ''}`
+      }
+
+      // Include suggestion block ONCE (only if a finding in the group has a valid fix)
+      const findingWithFix = group.find((f) => f.fix)
+      if (findingWithFix?.fix) {
+        body += `\n\n\`\`\`suggestion\n${findingWithFix.fix.replacement}\n\`\`\``
         const patch = state.patches?.find(
-          (p) => p.id === finding.id || p.file === finding.file
+          (p) => p.id === findingWithFix.id || p.file === findingWithFix.file
         )
         if (patch) {
           const headSha = state.cfg?.headSha ?? ''
           const traceId =
             process.env.CodeSentinel_RUN_ID || process.env.CODESENTINEL_RUN_ID || ''
-          const marker = `<!-- codesentinel:patch id=${patch.id} finding=${finding.id} sha=${headSha}${traceId ? ` trace=${traceId}` : ''} -->`
+          const marker = `<!-- codesentinel:patch id=${patch.id} finding=${findingWithFix.id} sha=${headSha}${traceId ? ` trace=${traceId}` : ''} -->`
           body += `\n\n<details><summary>Patch ${patch.id} · +${patch.stats.added} −${patch.stats.removed}</summary>\n\n\`\`\`diff\n${patch.diff}\n\`\`\`\n\n${marker}\n</details>`
           body += `\n\nReply \`/codesentinel apply ${patch.id}\` or \`/codesentinel reject ${patch.id}\`.`
         }
       }
 
+      const postStartLine = findingWithFix?.fix
+        ? findingWithFix.fix.startLine
+        : primary.startLine
+      const postEndLine = findingWithFix?.fix
+        ? findingWithFix.fix.endLine
+        : primary.endLine
+
       await reporter
         .postReviewComment({
-          filePath: finding.file,
+          filePath: primary.file,
           comment: body,
-          startLine: finding.startLine,
-          endLine: finding.endLine,
+          startLine: postStartLine,
+          endLine: postEndLine,
         })
         .catch((err) => {
           console.warn(
-            `[CodeSentinel] Failed to post comment on ${finding.file}:${finding.startLine}:`,
+            `[CodeSentinel] Failed to post comment on ${primary.file}:${primary.startLine}:`,
             err
           )
         })
@@ -125,12 +193,25 @@ export const report = (deps: ReportDeps = {}) => {
       summaryText += `\n\n> ⚠️ **Degraded components / tools**: ${state.degraded.join(', ')}`
     }
 
-    const hasRows = state.analyzerReports && state.analyzerReports.length > 0
+    const analyzerReportsWithTriage = (state.analyzerReports ?? []).map((row) => {
+      const toolFindings = state.staticFindings.filter((f) => f.source === row.tool)
+      const confirmed = toolFindings.filter((f) => f.status === 'confirmed').length
+      const dismissed = toolFindings.filter((f) => f.status === 'dismissed').length
+      return {
+        ...row,
+        confirmed,
+        dismissed,
+      }
+    })
+
+    const hasRows = analyzerReportsWithTriage.length > 0
     const summaryUrl = hasRows
-      ? await reporter.postSummary(summaryText, state.analyzerReports).catch((err) => {
-          console.warn('[CodeSentinel] Failed to post review summary:', err)
-          return undefined
-        })
+      ? await reporter
+          .postSummary(summaryText, analyzerReportsWithTriage)
+          .catch((err) => {
+            console.warn('[CodeSentinel] Failed to post review summary:', err)
+            return undefined
+          })
       : await reporter.postSummary(summaryText).catch((err) => {
           console.warn('[CodeSentinel] Failed to post review summary:', err)
           return undefined
@@ -139,6 +220,7 @@ export const report = (deps: ReportDeps = {}) => {
     return {
       summary: summaryText,
       summaryUrl: summaryUrl ?? null,
+      analyzerReports: analyzerReportsWithTriage,
       attempts,
     }
   }

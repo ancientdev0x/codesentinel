@@ -5,6 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import type { Finding } from './findings'
+import type { SgNode } from '@ast-grep/napi'
+import { langFor, nodeLineSpan, parseFile } from './ast/parse'
 
 const execFileAsync = promisify(execFile)
 
@@ -49,11 +51,130 @@ export interface Patch {
 }
 
 export class PatchError extends Error {
-  readonly kind = 'bad_patch' as const
+  readonly kind: 'bad_patch' | 'invalid_syntax'
 
-  constructor(message: string) {
+  constructor(message: string, kind: 'bad_patch' | 'invalid_syntax' = 'bad_patch') {
     super(message)
     this.name = 'PatchError'
+    this.kind = kind
+  }
+}
+
+const STATEMENT_KINDS = new Set([
+  'if_statement',
+  'for_statement',
+  'for_in_statement',
+  'for_of_statement',
+  'while_statement',
+  'do_statement',
+  'try_statement',
+  'with_statement',
+  'switch_statement',
+  'expression_statement',
+  'return_statement',
+  'throw_statement',
+  'break_statement',
+  'continue_statement',
+  'variable_statement',
+  'lexical_declaration',
+  'variable_declaration',
+  'assignment',
+  'augmented_assignment',
+  'assert_statement',
+  'raise_statement',
+  'pass_statement',
+])
+
+export const findEnclosingStatementSpan = (
+  root: SgNode | undefined,
+  startLine: number,
+  endLine: number
+): { startLine: number; endLine: number } | undefined => {
+  if (!root) return undefined
+  let matched: { startLine: number; endLine: number } | undefined
+  const walk = (node: SgNode) => {
+    const span = nodeLineSpan(node)
+    if (span.startLine <= startLine && span.endLine >= endLine) {
+      const k = String(node.kind())
+      if (
+        STATEMENT_KINDS.has(k) ||
+        k.endsWith('_statement') ||
+        k.endsWith('_declaration')
+      ) {
+        matched = span
+      }
+      for (const child of node.children()) {
+        walk(child)
+      }
+    }
+  }
+  walk(root)
+  return matched
+}
+
+export const countAstErrors = (root: SgNode | undefined): number => {
+  if (!root) return 0
+  let count = 0
+  const walk = (n: SgNode) => {
+    const k = n.kind()
+    if (k === 'ERROR' || k === 'MISSING') {
+      count++
+    }
+    for (const child of n.children()) {
+      walk(child)
+    }
+  }
+  walk(root)
+  return count
+}
+
+export const validateSyntax = async (
+  file: string,
+  rawContent: string,
+  newContent: string
+): Promise<void> => {
+  const lang = langFor(file)
+  if (!lang) return
+
+  const origRoot = parseFile(lang, rawContent)
+  const patchedRoot = parseFile(lang, newContent)
+
+  const origErrors = countAstErrors(origRoot)
+  const patchedErrors = countAstErrors(patchedRoot)
+
+  if (patchedErrors > origErrors) {
+    throw new PatchError(
+      `Patched file "${file}" has syntax errors (${patchedErrors} error/missing AST nodes vs ${origErrors} in original)`,
+      'invalid_syntax'
+    )
+  }
+
+  if (lang === 'python') {
+    try {
+      await runWithStdin(
+        'python3',
+        ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'],
+        newContent
+      )
+    } catch (pyErr: unknown) {
+      let origHadError = false
+      try {
+        await runWithStdin(
+          'python3',
+          ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'],
+          rawContent
+        )
+      } catch {
+        origHadError = true
+      }
+      if (!origHadError) {
+        const msg = pyErr instanceof Error ? pyErr.message : String(pyErr)
+        throw new PatchError(
+          `Patched file "${file}" has Python syntax/indentation error: ${msg.trim()}`,
+          'invalid_syntax'
+        )
+      }
+    }
   }
 }
 
@@ -133,13 +254,53 @@ export const buildPatch = async (workspace: string, finding: Finding): Promise<P
     )
   }
 
-  const beforeSection = lines.slice(0, fix.startLine - 1)
-  const afterSection = lines.slice(fix.endLine)
-  const newLines = [...beforeSection, ...replacementLines, ...afterSection]
+  const constructContent = (start: number, end: number): string => {
+    const beforeSection = lines.slice(0, start - 1)
+    const afterSection = lines.slice(end)
+    const newLines = [...beforeSection, ...replacementLines, ...afterSection]
+    let content = newLines.join(eol)
+    if (hasTrailingEol || (lines.length > 0 && newLines.length > 0)) {
+      content += eol
+    }
+    return content
+  }
 
-  let newContent = newLines.join(eol)
-  if (hasTrailingEol || (lines.length > 0 && newLines.length > 0)) {
-    newContent += eol
+  let newContent = constructContent(fix.startLine, fix.endLine)
+
+  // Post-apply syntax validation with statement expansion fallback
+  try {
+    await validateSyntax(finding.file, rawContent, newContent)
+  } catch (syntaxErr: unknown) {
+    if (syntaxErr instanceof PatchError && syntaxErr.kind === 'invalid_syntax') {
+      const lang = langFor(finding.file)
+      const origRoot = lang ? parseFile(lang, rawContent) : undefined
+      const encSpan = origRoot
+        ? findEnclosingStatementSpan(origRoot, fix.startLine, fix.endLine)
+        : undefined
+
+      let recovered = false
+      if (
+        encSpan &&
+        (encSpan.startLine < fix.startLine || encSpan.endLine > fix.endLine) &&
+        encSpan.startLine >= minAllowed &&
+        encSpan.endLine <= maxAllowed
+      ) {
+        const expandedContent = constructContent(encSpan.startLine, encSpan.endLine)
+        try {
+          await validateSyntax(finding.file, rawContent, expandedContent)
+          newContent = expandedContent
+          recovered = true
+        } catch {
+          // Statement expansion did not resolve syntax issue
+        }
+      }
+
+      if (!recovered) {
+        throw syntaxErr
+      }
+    } else {
+      throw syntaxErr
+    }
   }
 
   // Create temporary directory for git diff --no-index

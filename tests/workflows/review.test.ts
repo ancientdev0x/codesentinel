@@ -303,6 +303,8 @@ describe('review workflow run()', () => {
         status: 'ok',
         findings: 1,
         durationMs: 400,
+        confirmed: 0,
+        dismissed: 0,
       },
     ])
   })

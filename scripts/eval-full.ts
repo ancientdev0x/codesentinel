@@ -30,6 +30,7 @@ export interface PatchApplyResult {
   file: string
   linesChanged: number
   gitApplyCheck: 'passed' | 'failed'
+  syntaxValid?: boolean
   error?: string
 }
 
@@ -379,11 +380,42 @@ export const runSingleLiveEval = async (
 
       try {
         await execFileAsync('git', ['-C', repo.dir, 'apply', '--check', patchPath])
+        let syntaxValid = true
+        let syntaxError: string | undefined
+        const match = diffContent.match(/^\+\+\+ b\/(.*)$/m)
+        const relFile = match ? match[1].trim() : ''
+        if (relFile) {
+          const absFile = path.join(repo.dir, relFile)
+          try {
+            const rawContent = await fs.readFile(absFile, 'utf8')
+            const { validateSyntax } = await import('../src/review/patch')
+            const tmpClone = await fs.mkdtemp(
+              path.join(os.tmpdir(), 'eval-syntax-check-')
+            )
+            try {
+              await execFileAsync('git', ['clone', repo.dir, tmpClone])
+              await execFileAsync('git', ['-C', tmpClone, 'apply', patchPath])
+              const patchedContent = await fs.readFile(
+                path.join(tmpClone, relFile),
+                'utf8'
+              )
+              await validateSyntax(relFile, rawContent, patchedContent)
+            } finally {
+              await fs.rm(tmpClone, { recursive: true, force: true }).catch(() => {})
+            }
+          } catch (vErr: any) {
+            syntaxValid = false
+            syntaxError = vErr.message || String(vErr)
+          }
+        }
+
         patchApplyResults.push({
           patchId: pf.replace('.patch', ''),
-          file: '',
+          file: relFile,
           linesChanged,
-          gitApplyCheck: 'passed',
+          gitApplyCheck: syntaxValid ? 'passed' : 'failed',
+          syntaxValid,
+          error: syntaxError,
         })
       } catch (checkErr: any) {
         patchApplyResults.push({
@@ -391,6 +423,7 @@ export const runSingleLiveEval = async (
           file: '',
           linesChanged,
           gitApplyCheck: 'failed',
+          syntaxValid: false,
           error: checkErr.message || String(checkErr),
         })
       }
