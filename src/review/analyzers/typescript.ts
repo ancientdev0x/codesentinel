@@ -1,9 +1,13 @@
 import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { isAbsolute, join, relative } from 'node:path'
 import { type Finding, findingId } from '../findings'
 import type { RunResult, RunSpec } from '../../sandbox/run'
 import { runIsolated } from '../../sandbox/run'
 import { normalizeFilePath } from './bandit'
+
+const require = createRequire(import.meta.url)
+const tscBinPath = require.resolve('typescript/bin/tsc')
 
 export const TSC_OUTPUT_REGEX = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.+)$/
 
@@ -91,8 +95,8 @@ export const runTsc = async (
 
   const spec: RunSpec = {
     tool: 'tsc',
-    cmd: 'npx',
-    args: ['--no-install', 'tsc', '--noEmit', '-p', tsconfigPath, '--pretty', 'false'],
+    cmd: process.execPath,
+    args: [tscBinPath, '--noEmit', '-p', tsconfigPath, '--pretty', 'false'],
     cwd: workspace,
     timeoutMs,
     okExitCodes: [0, 1, 2], // 1 and 2 indicate type check errors

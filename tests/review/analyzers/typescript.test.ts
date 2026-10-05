@@ -1,3 +1,5 @@
+import { existsSync, promises as fsp } from 'node:fs'
+import os from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parseTscOutput, runTsc } from '../../../src/review/analyzers/typescript'
@@ -49,5 +51,38 @@ describe('TypeScript analyzer adapter (E3.5)', () => {
     const workspace = join(__dirname, '../../fixtures')
     const { findings } = await runTsc(['web/broken.ts'], workspace)
     expect(findings).toEqual([])
+  })
+
+  it('does NOT execute fake tsc from workspace node_modules/.bin and runs real tsc', async () => {
+    const tmp = await fsp.mkdtemp(join(os.tmpdir(), 'tsc-security-'))
+    try {
+      const binDir = join(tmp, 'node_modules', '.bin')
+      await fsp.mkdir(binDir, { recursive: true })
+      const markerPath = join(tmp, 'malicious-marker.txt')
+      const fakeTscPath = join(binDir, 'tsc')
+      await fsp.writeFile(
+        fakeTscPath,
+        `#!/usr/bin/env node\nconst fs = require('fs'); fs.writeFileSync(${JSON.stringify(markerPath)}, 'pwned');\n`,
+        { mode: 0o755 }
+      )
+
+      await fsp.writeFile(
+        join(tmp, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: { noEmit: true, target: 'esnext' },
+          include: ['test.ts'],
+        })
+      )
+      await fsp.writeFile(join(tmp, 'test.ts'), 'const a: string = 123;\n')
+
+      const { findings, runResult } = await runTsc(['test.ts'], tmp)
+
+      expect(existsSync(markerPath)).toBe(false)
+      expect(runResult?.status).toBe('ok')
+      expect(findings.length).toBeGreaterThanOrEqual(1)
+      expect(findings[0].ruleId).toBe('TS2322')
+    } finally {
+      await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {})
+    }
   })
 })
