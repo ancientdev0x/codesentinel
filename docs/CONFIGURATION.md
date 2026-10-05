@@ -50,6 +50,11 @@ Set the credential matching your chosen `MODEL` prefix (`src/common/models.ts`):
 | `openrouter/<model>` | `OPENROUTER_API_KEY` |
 | `cloudflare-workers-ai/<model>` | `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID` |
 | `cloudflare-ai-gateway/<model>` | `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_GATEWAY_ID` |
+| `openai-codex/<model>` | Codex CLI auth (`~/.codex/auth.json` or `CodeSentinel_CODEX_TOKEN`, local only) |
+
+# Optional: use your ChatGPT subscription via Codex CLI auth (local only)
+# CodeSentinel_MODEL=openai-codex/gpt-5.6-luna
+# CodeSentinel_THINKING_LEVEL=medium
 
 The default model is `anthropic/claude-sonnet-4-6`, which needs `ANTHROPIC_API_KEY`.
 

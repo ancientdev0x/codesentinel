@@ -9,6 +9,7 @@ import { buildReviewGraph } from '../graph/review-graph'
 import type { StageError } from '../graph/state'
 import { flushTracing, initTracing } from '../observability/langfuse'
 import type { PromptableSession } from '../observability/tokens'
+import { registerCodexProvider } from '../common/codex-auth'
 import { type ReviewPayload, resolveReviewConfig } from '../review/config'
 import { dedupeFindings } from '../review/findings'
 
@@ -70,6 +71,8 @@ export default defineWorkflow({
       | undefined
 
     if (input?.resume) {
+      const cfg = resolveReviewConfig(input, process.env)
+      await registerCodexProvider(cfg.model, cfg.thinkingLevel)
       const { threadId, decisions } = input.resume
       process.env.CodeSentinel_RUN_ID = threadId
       process.env.CODESENTINEL_RUN_ID = threadId
@@ -129,6 +132,7 @@ export default defineWorkflow({
     }
 
     const cfg = resolveReviewConfig(input, process.env)
+    await registerCodexProvider(cfg.model, cfg.thinkingLevel)
     if (input?.platform) {
       process.env.CodeSentinel_INPUT_PLATFORM = input.platform
     } else {
