@@ -64,11 +64,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check for OpenAI API key
+        id: check-key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -n "$OPENAI_API_KEY" ]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: CodeSentinel self-review 🚢
+        if: steps.check-key.outputs.has_key == 'true'
         uses: ./
         continue-on-error: true
         with:
           MODEL: openai/gpt-5.5
           THINKING_LEVEL: high
+          IGNORE: "tests/fixtures/**,eval-results/**"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
