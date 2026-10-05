@@ -24,7 +24,7 @@ export interface DetectorMetrics {
 }
 
 export interface EvalReport {
-  timestamp: string
+  timestamp?: string
   detectors: Record<string, DetectorMetrics>
   union: DetectorMetrics
   totalLabels: number
@@ -194,7 +194,6 @@ export async function runDeterministicEval(
     const markdownTable = rows.join('\n')
 
     const report: EvalReport = {
-      timestamp: new Date().toISOString(),
       detectors: detectorMetrics,
       union: unionMetrics,
       totalLabels: labels.length,
@@ -204,17 +203,19 @@ export async function runDeterministicEval(
       markdownTable,
     }
 
-    // Save eval-results/deterministic.json
-    try {
-      const outDir = path.join(process.cwd(), 'eval-results')
-      await fsp.mkdir(outDir, { recursive: true })
-      await fsp.writeFile(
-        path.join(outDir, 'deterministic.json'),
-        JSON.stringify(report, null, 2) + '\n',
-        'utf8'
-      )
-    } catch {
-      // ignore write errors in constrained environments
+    // Save eval-results/deterministic.json only when EVAL_WRITE=1
+    if (process.env.EVAL_WRITE === '1') {
+      try {
+        const outDir = path.join(process.cwd(), 'eval-results')
+        await fsp.mkdir(outDir, { recursive: true })
+        await fsp.writeFile(
+          path.join(outDir, 'deterministic.json'),
+          JSON.stringify(report, null, 2) + '\n',
+          'utf8'
+        )
+      } catch {
+        // ignore write errors in constrained environments
+      }
     }
 
     return report

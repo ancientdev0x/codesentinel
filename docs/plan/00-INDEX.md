@@ -5,7 +5,7 @@ This plan turns CodeSentinel into the system described in the resume entry below
 > **CodeSentinel: Autonomous DevSecOps Review Agent**
 > - (C1) Built automated multi-stage review pipelines ingesting git diffs and PR URLs, extracting changed code fragments for strict AST-level checks.
 > - (C2) Integrated sandboxed utilities using timeout isolation leveraging Bandit with Ruff, identifying security vulnerabilities and critical regressions.
-> - (C3) Architected a LangGraph cyclic state engine orchestrating tool execution and failure analysis, running self-correcting recovery mechanisms.
+> - (C3) Architected a LangGraph cyclic state engine orchestrating tool execution and failure analysis, running bounded retries where out-of-diff findings are self-corrected by re-prompting, and analyzer timeouts are retried, then degraded gracefully so the review still completes.
 > - (C4) Implemented human-in-the-loop workflows generating unified diff patches, tracking tool latency and tokens using strict Langfuse pipelines.
 
 Current state and evidence: see `docs/RESUME_AUDIT.md`.

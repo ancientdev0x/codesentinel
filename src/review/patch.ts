@@ -179,6 +179,31 @@ export const validateSyntax = async (
 }
 
 /**
+ * Trims trailing lines from replacement if they duplicate the lines
+ * immediately following the replaced range.
+ */
+export const trimTrailingDuplicates = (
+  replacementLines: string[],
+  followingLines: string[]
+): string[] => {
+  const result = [...replacementLines]
+  const maxOverlap = Math.min(result.length, followingLines.length)
+  for (let k = maxOverlap; k >= 1; k--) {
+    let matches = true
+    for (let i = 0; i < k; i++) {
+      if (result[result.length - k + i].trimEnd() !== followingLines[i].trimEnd()) {
+        matches = false
+        break
+      }
+    }
+    if (matches) {
+      return result.slice(0, result.length - k)
+    }
+  }
+  return result
+}
+
+/**
  * Builds a verified unified diff Patch from a Finding fix.
  * Replaces lines fix.startLine..fix.endLine with fix.replacement,
  * generates a unified diff via `git diff --no-index`, rewrites headers,
@@ -243,8 +268,16 @@ export const buildPatch = async (workspace: string, finding: Finding): Promise<P
     )
   }
 
-  const replacementLines =
+  let replacementLines =
     fix.replacement.length === 0 ? [] : fix.replacement.replace(/\r\n/g, '\n').split('\n')
+
+  // Trim trailing lines that duplicate lines immediately after the replaced range
+  const afterLines = lines.slice(fix.endLine)
+  const trimmedLines = trimTrailingDuplicates(replacementLines, afterLines)
+  if (trimmedLines.length < replacementLines.length) {
+    replacementLines = trimmedLines
+    fix.replacement = replacementLines.join(eol)
+  }
 
   // Quick initial check on change volume
   const removedLinesCount = fix.endLine - fix.startLine + 1

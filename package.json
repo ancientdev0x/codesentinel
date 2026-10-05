@@ -19,6 +19,7 @@
     "qa": "flue run qa --target node",
     "dev": "flue dev --target node",
     "build": "flue build --target node",
+    "build:analyzers": "docker build -f docker/analyzers.Dockerfile -t codesentinel-analyzers:0.1.0 .",
     "start": "node dist/server.mjs",
     "prepublishOnly": "flue build --target node",
     "release": "npm run build && changeset publish",
@@ -80,6 +81,7 @@
     "oxlint": "^1.71.0",
     "patch-package": "^8.0.1",
     "typescript": "^5.1.6",
+    "vite-node": "^3.2.4",
     "vitest": "^3.2.4"
   },
   "overrides": {

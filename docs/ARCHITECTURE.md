@@ -117,7 +117,7 @@ serves `POST /workflows/<name>` automatically.
 - `static_analysis`: sandboxed Bandit + Ruff + TypeScript analysis inside isolated Docker or host container (`src/review/analyzers/*`).
 - `llm_triage`: flue agent loop drives contextual review and triage via `record_finding` and `triage_finding` tools (`src/tools/*`).
 - `validate`: strict validation enforcing diff range intersection, triage decisions on pre-detected findings, and patch format (`src/graph/nodes/validate.ts`).
-- `failure_analysis`: deterministic error classification that routes retry cycles (with doubled timeouts, backend fallbacks, or violation hints) or marks unrecoverable stages as degraded (`src/graph/nodes/failure-analysis.ts`).
+- `failure_analysis`: deterministic error classification that implements bounded retries — out-of-diff findings are self-corrected by re-prompting; analyzer timeouts are retried, then degraded gracefully so the review still completes (`src/graph/nodes/failure-analysis.ts`).
 - `human_review`: human-in-the-loop inspection checkpoint.
 - `report`: deduplication, inline comment reporting, and PR summary generation (`src/github/reporter.ts`).
 
