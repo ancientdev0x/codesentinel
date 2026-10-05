@@ -74,56 +74,58 @@ export default defineWorkflow({
       process.env.CodeSentinel_RUN_ID = threadId
       process.env.CODESENTINEL_RUN_ID = threadId
 
-      let sessionInstance: PromptableSession | undefined
-      const graph = buildReviewGraph({
-        llmTriage: {
-          sessionFactory: async () => {
-            if (!sessionInstance) {
-              sessionInstance = await harness.session()
-            }
-            return sessionInstance
+      try {
+        let sessionInstance: PromptableSession | undefined
+        const graph = buildReviewGraph({
+          llmTriage: {
+            sessionFactory: async () => {
+              if (!sessionInstance) {
+                sessionInstance = await harness.session()
+              }
+              return sessionInstance
+            },
           },
-        },
-      })
+        })
 
-      const resumeCommand = new Command({ resume: decisions })
-      const resumedState: any = await graph.invoke(resumeCommand as any, {
-        configurable: { thread_id: threadId },
-        recursionLimit: 25,
-      })
+        const resumeCommand = new Command({ resume: decisions })
+        const resumedState: any = await graph.invoke(resumeCommand as any, {
+          configurable: { thread_id: threadId },
+          recursionLimit: 25,
+        })
 
-      if (resumedState.__interrupt__ && resumedState.__interrupt__.length > 0) {
-        const payload = resumedState.__interrupt__[0].value
+        if (resumedState.__interrupt__ && resumedState.__interrupt__.length > 0) {
+          const payload = resumedState.__interrupt__[0].value
+          return {
+            status: 'awaiting_approval',
+            threadId,
+            patches: payload.patches ?? [],
+            error: payload.error,
+          } as unknown as JsonValue
+        }
+
+        const confirmedFindings = [
+          ...resumedState.staticFindings.filter((f: any) => f.status === 'confirmed'),
+          ...resumedState.llmFindings,
+        ]
+        const findings = dedupeFindings(confirmedFindings)
+
         return {
-          status: 'awaiting_approval',
-          threadId,
-          patches: payload.patches ?? [],
-          error: payload.error,
+          status: 'completed',
+          reviewed: resumedState.files?.length ?? 0,
+          summaryPosted: Boolean(resumedState.summaryUrl),
+          summaryUrl: resumedState.summaryUrl ?? null,
+          summary: resumedState.summary ?? '',
+          applied: resumedState.applied ?? [],
+          findings,
+          degraded: resumedState.degraded ?? [],
+          attempts: resumedState.attempts ?? {},
         } as unknown as JsonValue
+      } finally {
+        deleteCollector(threadId)
+        await flushTracing().catch((err) => {
+          console.warn('[CodeSentinel] Failed to flush Langfuse tracing:', err)
+        })
       }
-
-      const confirmedFindings = [
-        ...resumedState.staticFindings.filter((f: any) => f.status === 'confirmed'),
-        ...resumedState.llmFindings,
-      ]
-      const findings = dedupeFindings(confirmedFindings)
-
-      const result = {
-        status: 'completed',
-        reviewed: resumedState.files?.length ?? 0,
-        summaryPosted: Boolean(resumedState.summaryUrl),
-        summaryUrl: resumedState.summaryUrl ?? null,
-        summary: resumedState.summary ?? '',
-        applied: resumedState.applied ?? [],
-      }
-
-      Object.defineProperties(result, {
-        findings: { value: findings, enumerable: false },
-        degraded: { value: resumedState.degraded ?? [], enumerable: false },
-        attempts: { value: resumedState.attempts ?? {}, enumerable: false },
-      })
-
-      return result as unknown as JsonValue
     }
 
     const cfg = resolveReviewConfig(input, process.env)
@@ -204,20 +206,15 @@ export default defineWorkflow({
       ]
       const findings = dedupeFindings(confirmedFindings)
 
-      const result = {
+      return {
         reviewed: finalState.files.length,
         summaryPosted: Boolean(finalState.summaryUrl),
         summaryUrl: finalState.summaryUrl ?? null,
         summary: finalState.summary,
-      }
-
-      Object.defineProperties(result, {
-        findings: { value: findings, enumerable: false },
-        degraded: { value: finalState.degraded, enumerable: false },
-        attempts: { value: finalState.attempts, enumerable: false },
-      })
-
-      return result as unknown as JsonValue
+        findings,
+        degraded: finalState.degraded,
+        attempts: finalState.attempts,
+      } as unknown as JsonValue
     } finally {
       deleteCollector(runId)
       await flushTracing().catch((err) => {

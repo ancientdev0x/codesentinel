@@ -107,7 +107,7 @@ describe('review workflow run()', () => {
     expect(createReporter).toHaveBeenCalledTimes(1)
     expect(postSummary).toHaveBeenCalledWith('SUMMARY')
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       reviewed: 1,
       summaryPosted: true,
       summaryUrl: 'http://s',
