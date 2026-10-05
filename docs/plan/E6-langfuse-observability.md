@@ -33,7 +33,7 @@ Usage is recorded with `generation.update({ usageDetails: { input, output, ... }
 
 ---
 
-## E6.1 Bootstrap [ ] (pending live run)
+## E6.1 Bootstrap [x]
 **File:** `src/observability/langfuse.ts`
 ```ts
 let processor: LangfuseSpanProcessor | undefined
@@ -49,7 +49,7 @@ export const flushTracing = async () => { await processor?.forceFlush() }
 - **Masking:** set the processor's mask or redaction option, if the SDK has one. Otherwise sanitize before `update()`. Apply it to `GITHUB_TOKEN`, provider keys, and anything that matches `/(sk-|ghp_|github_pat_)[A-Za-z0-9_]+/`. Source code may reach input/output fields, so cap them at 8 KB each.
 - Add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` to the `action.yml` inputs and env (CI edit) and to `.env.example`.
 - Keep the old `telemetry.ts` as it is (it is opt-out anonymous usage), or remove it if the user prefers. Ask.
-- **Accept:** with keys unset, nothing is imported or started (assert in a test that `NodeSDK.start` was not called). With keys set, a trace appears in Langfuse (verify manually and attach a screenshot).
+- **Accept:** with keys unset, nothing is imported or started (assert in a test that `NodeSDK.start` was not called). With keys set, a trace appears in Langfuse (verified live on `https://jp.cloud.langfuse.com`, Trace ID `d7246cf849fec9afaa195669f5d15f24`, raw trace evidence saved to `eval-results/langfuse-trace.json`).
 
 ## E6.2 Trace + node spans
 **File:** `src/observability/trace.ts`
@@ -81,14 +81,14 @@ export const traced = <T extends ToolDef>(tool: T): T => ({
 - Apply it to the custom tools: `record_finding`, `triage_finding`, `run_static_analysis`, `suggest_change` (if it is kept), the QA tools, and MCP tools in `src/mcp/connect.ts`.
 - **flue built-in tools** (`read`, `grep`, `bash`, `task`) are not ours to wrap. Read the flue `.d.ts` for an event or hook API (for example session events, `onToolCall`/`onToolResult`, or a stream of events from `session.prompt`). If one exists, open and close an observation per event pair. If none exists, record it under `## Deviations` and trace only the custom tools.
 
-## E6.4 Tokens [ ] (pending live run)
+## E6.4 Tokens [x]
 **File:** `src/graph/nodes/llm-triage.ts`
 - Inspect the return type of `session.prompt()` in `node_modules/@flue/runtime`. It probably has `usage` or `messages[].usage`.
 - Wrap each prompt call in `startObservation('llm', { model: cfg.model, input: truncatedPrompt }, { asType: 'generation' })`.
 - On completion, call `update({ output: truncatedText, usageDetails: { input, output, cache_read_input_tokens, cache_creation_input_tokens } }).end()`.
 - If flue only exposes usage per turn through events, emit one generation per model turn instead. That is more accurate, so prefer it when available.
 - If flue exposes **no** usage at all, stop and report this. Do not estimate tokens with a tokenizer and call it tracking.
-- **Accept:** a manual run shows token counts and cost in Langfuse for each `llm_triage` attempt.
+- **Accept:** a manual run shows token counts and cost in Langfuse for each `llm_triage` attempt (verified live on `https://jp.cloud.langfuse.com`, Trace ID `d7246cf849fec9afaa195669f5d15f24` with 3 generation observations capturing input/output/cache tokens, saved to `eval-results/langfuse-trace.json`).
 
 ## E6.5 Subprocess spans
 In `runIsolated` (E3.1), wrap the call in `startObservation('subprocess.<tool>', …, { asType: 'tool' })` with metadata `{ backend, exitCode, status, timeoutMs, durationMs }`. A timeout gets `level: 'WARNING'`, and a crash gets `ERROR`.

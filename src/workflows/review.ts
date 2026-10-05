@@ -9,9 +9,12 @@ import { buildReviewGraph } from '../graph/review-graph'
 import type { StageError } from '../graph/state'
 import { flushTracing, initTracing } from '../observability/langfuse'
 import type { PromptableSession } from '../observability/tokens'
+import { updateActiveTrace } from '../observability/trace'
 import { registerCodexProvider } from '../common/codex-auth'
 import { type ReviewPayload, resolveReviewConfig } from '../review/config'
 import { dedupeFindings } from '../review/findings'
+import { startActiveObservation } from '@langfuse/tracing'
+import { trace } from '@opentelemetry/api'
 
 /**
  * Permissive top-level object schema for workflow run payload.
@@ -161,13 +164,32 @@ export default defineWorkflow({
         },
       })
 
-      const finalState: any = await graph.invoke(
-        { cfg },
-        {
-          configurable: { thread_id: runId },
-          recursionLimit: 25,
+      const finalState: any = await startActiveObservation('review', async (rootSpan) => {
+        updateActiveTrace({
+          name: 'review',
+          sessionId: cfg.github
+            ? `${cfg.github.owner}/${cfg.github.repo}#${cfg.github.prNumber}`
+            : runId,
+          tags: [cfg.platform, cfg.model],
+          metadata: {
+            repo: cfg.github ? `${cfg.github.owner}/${cfg.github.repo}` : cfg.workspace,
+            pr: cfg.github?.prNumber ?? 0,
+            runId,
+            model: cfg.model,
+          },
+        })
+        const traceId = rootSpan?.traceId || trace.getActiveSpan()?.spanContext().traceId
+        if (traceId) {
+          console.log(`[CodeSentinel:Langfuse] Trace ID: ${traceId}`)
         }
-      )
+        return await graph.invoke(
+          { cfg },
+          {
+            configurable: { thread_id: runId },
+            recursionLimit: 25,
+          }
+        )
+      })
 
       if (finalState.__interrupt__ && finalState.__interrupt__.length > 0) {
         const payload = finalState.__interrupt__[0].value

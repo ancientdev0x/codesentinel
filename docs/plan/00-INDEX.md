@@ -80,10 +80,10 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E5.4 GitHub mode: patch comments with ids + `/codesentinel apply|reject <id>` handler
   - [x] E5.5 Mention workflow update (needs CI-edit approval)
 - [x] **E6 Langfuse observability** (C4b): [`E6-langfuse-observability.md`](E6-langfuse-observability.md) *(~1d, can start after E0)*
-  - [ ] E6.1 OTel + `LangfuseSpanProcessor` bootstrap, env-gated, flush on exit (pending live run)
+  - [x] E6.1 OTel + `LangfuseSpanProcessor` bootstrap, env-gated, flush on exit
   - [x] E6.2 Trace per review; span per graph node
   - [x] E6.3 `traced()` wrapper on every tool → per-tool latency + error level
-  - [ ] E6.4 Generation observations with token `usageDetails` from flue (pending live run)
+  - [x] E6.4 Generation observations with token `usageDetails` from flue
   - [x] E6.5 Subprocess spans (bandit/ruff/docker) with duration, exit, timeout flag
   - [x] E6.6 Strictness: schema-validated metadata, CI test that fails if a tool is unwrapped
 - [x] **E7 Evaluation + metrics** (makes "identifying vulnerabilities" provable): [`E7-eval-and-metrics.md`](E7-eval-and-metrics.md) *(~1d, last)*

@@ -86,7 +86,11 @@ export const initTracing = (env: NodeJS.ProcessEnv = process.env): boolean => {
   processor = new LangfuseSpanProcessor({
     publicKey,
     secretKey,
-    baseUrl: env.LANGFUSE_BASE_URL ?? env.LANGFUSE_HOST ?? 'https://cloud.langfuse.com',
+    baseUrl:
+      env.LANGFUSE_BASE_URL ??
+      env.LANGFUSE_BASEURL ??
+      env.LANGFUSE_HOST ??
+      'https://cloud.langfuse.com',
     environment: env.CodeSentinel_ENV ?? env.CODESENTINEL_ENV ?? env.NODE_ENV ?? 'ci',
     mask: maskSensitiveData,
   })
