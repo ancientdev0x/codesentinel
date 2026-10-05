@@ -54,12 +54,12 @@ Steps:
 - **Tests:** mock Octokit, and use a local bare repo as "origin" with `file://` so the test needs no network. Cover the fork-deleted fallback.
 - **Accept:** for the local bare repo, the returned workspace has `headSha` checked out and `git merge-base base head` succeeds.
 
-## E1.3 CLI + payload [ ] (pending live run)
+## E1.3 CLI + payload [x]
 **Files:** `bin/CodeSentinel.mjs`, `src/workflows/review.ts`, `src/review/config.ts`
 - Parse `--pr <url>` and `--pr=<url>` in the bin, and put `prUrl` in the POST payload (around `bin/CodeSentinel.mjs:233`). Update `HELP`.
 - In the workflow (or in the E4 `ingest` node, which supersedes this): if `cfg.prUrl` is set, run `materializePr` and override `cfg.workspace`, `cfg.baseSha` and `cfg.headSha`. When `GITHUB_TOKEN` is present, also set `cfg.github = {owner, repo, prNumber, token}`.
 - Keep the existing behaviour unchanged when `prUrl` is absent.
-- **Accept:** `node bin/CodeSentinel.mjs review --pr <public PR url>` with no token writes a local report about that PR's files. Verify manually on a small public PR and paste the output path.
+- **Accept:** `node bin/CodeSentinel.mjs review --pr <public PR url>` with no token writes a local report about that PR's files (verified live against `https://github.com/ancientdev0x/codesentinel-demo/pull/1`, output saved to `eval-results/remote-pr-run.log`).
 
 ## E1.4 Reporter targeting [x]
 **Files:** `src/github/reporter.ts`, `src/review/config.ts`

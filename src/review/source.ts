@@ -167,7 +167,13 @@ export const materializePr = async (
   }
 
   // Pass token as extraheader, never embed in url or log
-  const authArgs = token ? ['-c', `http.extraheader=AUTHORIZATION: bearer ${token}`] : []
+  // GitHub HTTP smart protocol requires Basic auth (x-access-token:<token>)
+  const authArgs = token
+    ? [
+        '-c',
+        `http.extraheader=AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
+      ]
+    : []
 
   try {
     await runGit(['init'])

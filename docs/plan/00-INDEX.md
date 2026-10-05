@@ -50,7 +50,7 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
 - [x] **E1 PR URL ingestion** (C1): [`E1-pr-url-ingestion.md`](E1-pr-url-ingestion.md) *(~1d)*
   - [x] E1.1 `parsePrUrl()` + tests
   - [x] E1.2 `src/review/source.ts`: fetch PR meta, shallow-fetch head/base into a temp worktree
-  - [ ] E1.3 CLI `CodeSentinel review --pr <url>` and payload `prUrl` (pending live run)
+  - [x] E1.3 CLI `CodeSentinel review --pr <url>` and payload `prUrl`
   - [x] E1.4 Make the reporter target the URL's PR (post comments there when a token is available)
 - [x] **E2 AST fragment extraction + AST checks** (C1): [`E2-ast-extraction.md`](E2-ast-extraction.md) *(~1.5d)*
   - [x] E2.1 `@ast-grep/napi` + Python language registration; `src/review/ast/parse.ts`
