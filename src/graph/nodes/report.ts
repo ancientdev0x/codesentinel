@@ -1,5 +1,6 @@
 import { createReporter } from '../../github/reporter'
 import { dedupeFindings } from '../../review/findings'
+import { getRejectedIds } from '../../review/patch-commands'
 import type { ReviewStateType, ReviewStateUpdate } from '../state'
 
 export interface ReportDeps {
@@ -17,9 +18,16 @@ export const report = (deps: ReportDeps = {}) => {
 
     const reporter = doCreateReporter(state.cfg)
 
-    // Gather confirmed findings: confirmed static findings + valid LLM findings
-    const confirmedStatic = state.staticFindings.filter((f) => f.status === 'confirmed')
-    const allFindings = dedupeFindings([...confirmedStatic, ...state.llmFindings])
+    const rejectedIds = state.cfg?.workspace
+      ? await getRejectedIds(state.cfg.workspace)
+      : new Set<string>()
+
+    // Gather confirmed findings: confirmed static findings + valid LLM findings (skipping rejected)
+    const confirmedStatic = state.staticFindings.filter(
+      (f) => f.status === 'confirmed' && !rejectedIds.has(f.id)
+    )
+    const validLlm = (state.llmFindings ?? []).filter((f) => !rejectedIds.has(f.id))
+    const allFindings = dedupeFindings([...confirmedStatic, ...validLlm])
 
     // Post inline review comments for all confirmed findings
     for (const finding of allFindings) {
@@ -32,6 +40,17 @@ export const report = (deps: ReportDeps = {}) => {
       }
       if (finding.fix) {
         body += `\n\n\`\`\`suggestion\n${finding.fix.replacement}\n\`\`\``
+        const patch = state.patches?.find(
+          (p) => p.id === finding.id || p.file === finding.file
+        )
+        if (patch) {
+          const headSha = state.cfg?.headSha ?? ''
+          const traceId =
+            process.env.CodeSentinel_RUN_ID || process.env.CODESENTINEL_RUN_ID || ''
+          const marker = `<!-- codesentinel:patch id=${patch.id} finding=${finding.id} sha=${headSha}${traceId ? ` trace=${traceId}` : ''} -->`
+          body += `\n\n<details><summary>Patch ${patch.id} · +${patch.stats.added} −${patch.stats.removed}</summary>\n\n\`\`\`diff\n${patch.diff}\n\`\`\`\n\n${marker}\n</details>`
+          body += `\n\nReply \`/codesentinel apply ${patch.id}\` or \`/codesentinel reject ${patch.id}\`.`
+        }
       }
 
       await reporter

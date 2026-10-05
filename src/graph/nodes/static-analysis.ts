@@ -1,5 +1,6 @@
 import { type AnalyzerToolName, runStaticAnalysis } from '../../review/analyzers'
 import type { ReviewConfig } from '../../review/config'
+import { getRejectedIds } from '../../review/patch-commands'
 import type { ReviewStateType, ReviewStateUpdate, StageError } from '../state'
 
 export interface StaticAnalysisDeps {
@@ -68,8 +69,13 @@ export const staticAnalysis = (deps: StaticAnalysisDeps = {}) => {
         }
       }
 
+      const rejectedIds = state.cfg.workspace
+        ? await getRejectedIds(state.cfg.workspace)
+        : new Set<string>()
+      const nonRejected = (result.findings ?? []).filter((f) => !rejectedIds.has(f.id))
+
       return {
-        staticFindings: [...(state.staticFindings ?? []), ...(result.findings ?? [])],
+        staticFindings: [...(state.staticFindings ?? []), ...nonRejected],
         analyzerReports: [...(state.analyzerReports ?? []), ...(result.reports ?? [])],
         errors,
         attempts,

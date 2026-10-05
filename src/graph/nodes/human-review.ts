@@ -7,6 +7,7 @@ import {
   type Patch,
 } from '../../review/patch'
 import type { Finding } from '../../review/findings'
+import { getRejectedIds } from '../../review/patch-commands'
 import type { ReviewStateType, ReviewStateUpdate } from '../state'
 
 export interface HumanReviewDeps {
@@ -38,10 +39,11 @@ export const humanReview = (deps?: HumanReviewDeps) => {
     }
 
     const workspace = state.cfg?.workspace || process.cwd()
+    const rejectedIds = workspace ? await getRejectedIds(workspace) : new Set<string>()
 
-    // Collect confirmed findings that have a fix attached
+    // Collect confirmed findings that have a fix attached (skipping rejected)
     const candidateFindings = [...state.llmFindings, ...state.staticFindings].filter(
-      (f) => f.status === 'confirmed' && f.fix
+      (f) => f.status === 'confirmed' && f.fix && !rejectedIds.has(f.id)
     )
 
     const patches = await doBuildPatches(workspace, candidateFindings)

@@ -1,3 +1,6 @@
+import { promises as fsp } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { extractAst } from '../../src/graph/nodes/extract-ast'
 import { failureAnalysis } from '../../src/graph/nodes/failure-analysis'
@@ -10,6 +13,7 @@ import { validate } from '../../src/graph/nodes/validate'
 import type { ReviewStateType } from '../../src/graph/state'
 import { resolveReviewConfig } from '../../src/review/config'
 import type { Finding } from '../../src/review/findings'
+import { recordRejectedPatch } from '../../src/review/patch-commands'
 
 describe('ReviewGraph nodes (E4.2)', () => {
   const baseCfg = resolveReviewConfig({ platform: 'local', workspace: process.cwd() }, {})
@@ -156,6 +160,58 @@ describe('ReviewGraph nodes (E4.2)', () => {
     expect(postReviewComment).toHaveBeenCalled()
     expect(postSummary).toHaveBeenCalled()
     expect(update.attempts?.report).toBe(1)
+  })
+
+  it('report node skips findings whose id was rejected', async () => {
+    const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'report-reject-test-'))
+    try {
+      await recordRejectedPatch(tmpDir, 'p1234567', 'user1', 'f-rejected')
+
+      const postReviewComment = vi.fn().mockResolvedValue('url')
+      const postSummary = vi.fn().mockResolvedValue('url')
+      const node = report({
+        createReporter: () => ({ postReviewComment, postSummary }) as any,
+      })
+
+      await node({
+        ...baseState,
+        cfg: { ...baseCfg, workspace: tmpDir },
+        staticFindings: [
+          {
+            id: 'f-rejected',
+            source: 'bandit',
+            ruleId: 'B602',
+            severity: 'high',
+            file: 'src/main.ts',
+            startLine: 1,
+            endLine: 1,
+            message: 'Insecure call',
+            status: 'confirmed',
+          },
+          {
+            id: 'f-allowed',
+            source: 'bandit',
+            ruleId: 'B603',
+            severity: 'high',
+            file: 'src/main.ts',
+            startLine: 1,
+            endLine: 1,
+            message: 'Allowed call',
+            status: 'confirmed',
+          },
+        ],
+        llmFindings: [],
+      })
+
+      expect(postReviewComment).toHaveBeenCalledTimes(1)
+      expect(postReviewComment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          comment: expect.stringContaining('Allowed call'),
+        })
+      )
+    } finally {
+      await fsp.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+    }
   })
 
   it('llm_triage prompts active session and captures summary', async () => {
