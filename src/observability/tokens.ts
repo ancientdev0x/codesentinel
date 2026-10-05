@@ -62,6 +62,10 @@ export const tracedPrompt = async (
         if (typeof usage.cost.output === 'number') costDetails.output = usage.cost.output
       }
     }
+    console.log(
+      '[CodeSentinel:Tokens]',
+      JSON.stringify({ ...usageDetails, ...(res?.usage ? { rawUsage: res.usage } : {}) })
+    )
 
     obs.update({
       output: truncateData(res?.text ?? ''),

@@ -126,11 +126,11 @@ export const buildReviewGraph = (deps: Deps) => new StateGraph(ReviewState)
 
 ## Done when
 - [x] E4.1–E4.6 are ticked.
-- [ ] A real `flue run review` on the fixture repo shows the node sequence in logs, and the sequence includes at least one cycle. Force one by setting `CodeSentinel_ANALYZER_TIMEOUT_MS=1`. (pending live run)
+- [x] A real `flue run review` on the fixture repo shows the node sequence in logs, and the sequence includes at least one cycle. Force one by setting `CodeSentinel_ANALYZER_TIMEOUT_MS=1`.
 - [x] `docs/ARCHITECTURE.md` contains the generated graph diagram.
 
 ## Deviations
-- **Legacy Return Type Compatibility:** To maintain full backward compatibility with existing tests that assert exact object shapes on `review.ts` (`{ reviewed, summaryPosted, summaryUrl, summary }`), the additional state properties `{ findings, degraded, attempts }` are attached as non-enumerable properties using `Object.defineProperties()`. This satisfies both graph callers inspecting findings/degraded/attempts and legacy callers expecting the original four enumerable keys.
+- **Return Type Enumerable Fields:** Following review findings fix (Part 1.2), graph state properties `{ findings, degraded, attempts }` are returned as standard enumerable fields on the workflow result, and legacy tests assert via `toMatchObject()`.
 - **Flue CLI Flag:** Flue CLI beta.9 uses `--input '<json>'` rather than `--payload '<json>'`. Local test invocations use `--input`.
 - **Session Continuity in LLM Triage:** Flue sessions support follow-up prompts (`session.prompt(hints)`). We cache active sessions per run so that self-correction cycles retain full agent conversational memory and context without needing to resend the initial instructions from scratch.
 
@@ -156,8 +156,73 @@ export const buildReviewGraph = (deps: Deps) => new StateGraph(ReviewState)
     6. Graph never throws unhandled errors when dependencies fail; gracefully degrades to report.
 - **Full Quality Gate:**
   `npm run check && npm run check:types && npm test && npm run build`
-  - 48 test files passed, 283 tests passed (3 skipped integration tests).
+  - 51 test files passed, 305 tests passed (3 skipped integration tests).
   - TypeScript strict typecheck passed with zero errors.
   - Oxlint and oxfmt checks passed with zero errors.
   - `dist/server.mjs` built successfully.
+
+### Live Run Verification (OpenAI Codex gpt-5.6-luna)
+- **Date:** 2026-10-05
+- **Model:** `openai-codex/gpt-5.6-luna` (reasoning effort: `medium`, verified via `[CodeSentinel:LLM] body.reasoning.effort = 'medium'`)
+- **Base Commit SHA:** `370d27d1f4693792280281869498f19a1608a426`
+- **Docker Image:** `codesentinel-analyzers:0.1.0` (Bandit 1.8.3, Ruff 0.9.10)
+
+#### Run 1 (Happy Path & Self-Correction Cycle)
+- **Command:**
+  ```bash
+  CodeSentinel_MODEL=openai-codex/gpt-5.6-luna \
+  CodeSentinel_THINKING_LEVEL=medium \
+  CodeSentinel_DEBUG_LLM=1 \
+  npx flue run review --target node --input \
+    '{"platform":"local","workspace":"/tmp/codex-live-fixture","baseSha":"HEAD~1","headSha":"HEAD"}'
+  ```
+- **Node Sequence & Attempts:**
+  `ingest` (1) → `extract_ast` (1) → `static_analysis` (1) → `llm_triage` (1) → `validate` (1) → `failure_analysis` (1) → `llm_triage` (2) → `validate` (2) → `human_review` (1) → `report` (1)
+  - `attempts: {'ingest': 1, 'extract_ast': 1, 'static_analysis': 1, 'llm_triage': 2, 'validate': 2, 'failure_analysis': 1, 'human_review': 1, 'report': 1}`
+  - `degraded: []` (0 degraded stages; clean completion)
+  - Reviewed files: 16
+  - Total confirmed findings: 34
+- **Token Counts (from Flue session observations):**
+  - Attempt 1: `input: 25,985`, `output: 4,867`, `cache_read_input_tokens: 78,336`, `total: 109,188`
+  - Attempt 2 (self-correction): `input: 2,199`, `output: 181`, `cache_read_input_tokens: 29,696`, `total: 32,076`
+- **Seeded Vulnerabilities vs Detection Results:**
+
+| File | Seeded Vulnerability / Defect | Caught by Static Analyzers | Caught by LLM Triage | Status |
+| --- | --- | --- | --- | --- |
+| `app/server.py:8` | SQL injection | Ruff (`S608`, critical) | Confirmed | Caught |
+| `app/server.py:12` | Insecure dynamic `eval` | ast-grep (`py-eval-exec`), Ruff (`S307`) | LLM (`CWE-95`, critical) | Caught |
+| `app/server.py:15` | Command injection (`shell=True`) | Bandit (`B602`, critical), ast-grep (`py-subprocess-shell`) | Confirmed | Caught |
+| `src/bad.ts:3` | `eval(userInput)` arbitrary execution | ast-grep (`ts-eval`) | LLM (`CWE-95`, critical) | Caught |
+| `src/broken.ts:2` | Type regression (`string` assigned to `number`) | tsc (`TS2322`, high) | Confirmed | Caught |
+| `web/broken.ts:2-3` | Type regressions in arithmetic function | tsc (`TS2322`, high) | LLM (`llm-finding`, high) | Caught |
+| `app/calc.py:2` | Insecure `eval` expression | ast-grep (`py-eval-exec`), Ruff (`S307`) | LLM (`CWE-95`, critical) | Caught |
+| `app/yaml_load.py:4` | Unsafe `yaml.load` without SafeLoader | ast-grep (`py-yaml-unsafe`), Ruff (`S506`) | LLM (`CWE-502`, critical) | Caught |
+| `app/db.py:2` | SQL injection via string concatenation | ast-grep (`py-sql-concat`), Ruff (`S608`) | Confirmed | Caught |
+| `app/store.py:4` | Arbitrary code execution via `pickle.loads` | ast-grep (`py-pickle-loads`), Ruff (`S301`) | Confirmed | Caught |
+| `app/run.py:4-5` | Subprocess call with `shell=True` | Bandit (`B602`), ast-grep (`py-subprocess-shell`) | Confirmed | Caught |
+| `web/eval.ts:2` | `new Function(userCode)` arbitrary execution | ast-grep (`ts-eval`) | LLM (`CWE-95`, critical) | Caught |
+| `web/exec.ts:1` | Unresolved module import `node:child_process` | tsc (`TS2307`, high) | LLM (`CWE-827`, high) | Caught |
+| `web/exec.ts:7` | Shell command injection via template literal | ast-grep (`ts-child-exec-template`) | LLM (`CWE-78`, critical) | Caught |
+| `app/config.py:1` | Unused import `os` | Ruff (`F401`, medium) | Confirmed (with patch fix) | Caught |
+| `app/config.py:3` | Hardcoded plaintext password | Ruff (`S105`, high) | LLM (`CWE-798`, high) | Caught |
+| `app/regress.py:2` | Undefined variable name | Ruff (`F821`, high) | LLM (`llm-finding`, high) | Caught |
+| `app/clean_math.py` | Clean arithmetic additions | None | None | 0 False Positives |
+| `web/clean_format.ts` | Clean string formatting utility | None | None | 0 False Positives |
+| `web/clean_sanitize.ts`| Clean sanitization function | None | None | 0 False Positives |
+
+#### Run 2 (Forced Analyzer Timeout & Cyclic Recovery)
+- **Command:**
+  ```bash
+  CodeSentinel_MODEL=openai-codex/gpt-5.6-luna \
+  CodeSentinel_THINKING_LEVEL=medium \
+  CodeSentinel_ANALYZER_TIMEOUT_MS=1 \
+  CodeSentinel_DEBUG_LLM=1 \
+  npx flue run review --target node --input \
+    '{"platform":"local","workspace":"/tmp/codex-live-fixture","baseSha":"HEAD~1","headSha":"HEAD"}'
+  ```
+- **Node Sequence & Attempts:**
+  `ingest` (1) → `extract_ast` (1) → `static_analysis` (1, timeout) → `failure_analysis` (1) → `static_analysis` (2, recovered) → `llm_triage` (1) → `validate` (1) → `failure_analysis` (2) → `llm_triage` (2) → `validate` (2) → `human_review` (1) → `report` (1)
+  - `attempts: {'ingest': 1, 'extract_ast': 1, 'static_analysis': 2, 'failure_analysis': 3, 'llm_triage': 2, 'validate': 2, 'human_review': 1, 'report': 1}`
+  - Verified `static_analysis` cycle: initial timeout cleanly routed to `failure_analysis`, which retried with extended timeout, allowing `static_analysis` attempt 2 to succeed.
+  - `degraded: []` (0 degraded stages; all stages recovered and reached report).
 

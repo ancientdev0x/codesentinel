@@ -1,7 +1,9 @@
+import path from 'node:path'
 import * as v from 'valibot'
 import { FindingSchema, type Finding } from '../../review/findings'
 import { buildPatch, type Patch } from '../../review/patch'
 import type { ReviewStateType, ReviewStateUpdate, StageError } from '../state'
+import type { ReviewFileWithDiff } from '../../review/diff'
 
 export const validateFindingIntersectsDiff = (
   finding: Finding,
@@ -27,7 +29,14 @@ export const validate = (deps?: ValidateDeps) => {
 
     const errors: StageError[] = []
     const validLlmFindings: Finding[] = []
-    const fileMap = new Map(state.files.map((f) => [f.fileName, f]))
+    const fileMap = new Map<string, ReviewFileWithDiff>()
+    for (const f of state.files) {
+      fileMap.set(f.fileName, f)
+      if (state.cfg?.workspace) {
+        fileMap.set(path.relative(state.cfg.workspace, f.fileName), f)
+        fileMap.set(path.resolve(state.cfg.workspace, f.fileName), f)
+      }
+    }
 
     // 1 & 2 & 3: Validate LLM-produced findings
     for (const finding of state.llmFindings) {

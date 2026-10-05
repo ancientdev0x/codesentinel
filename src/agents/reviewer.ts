@@ -1,5 +1,6 @@
 import { createAgent } from '@flue/runtime'
 import { local } from '@flue/runtime/node'
+import { registerCodexProvider } from '../common/codex-auth'
 import { createReporter } from '../github/reporter'
 import { connectMcpServers } from '../mcp/connect'
 import { resolveReviewConfig } from '../review/config'
@@ -23,6 +24,7 @@ import { createSuggestChangeTool } from '../tools/suggest-change'
  */
 export default createAgent(async ({ env }) => {
   const cfg = resolveReviewConfig(undefined, env as NodeJS.ProcessEnv)
+  await registerCodexProvider(cfg.model, cfg.thinkingLevel)
   const reporter = createReporter(cfg)
   // MCP tools are optional (empty unless CodeSentinel_MCP_SERVERS is configured). They
   // are connected here per init; the review is one-shot, so the process exit tears
