@@ -81,6 +81,7 @@ The command handler is `handlePatchCommand(event)`:
 6. Log every decision to Langfuse (E6) as a score or event on the original trace if the trace id is in the marker. Add `trace=<id>` to the marker.
 
 - **Tests:** mock Octokit and use a temp repo. Cover the parse regex, rejection of an unauthorized author, rejection of a stale SHA, refusal on a fork, the happy-path commit, and reject marking.
+- **Verification:** Unit tests in `tests/review/patch-commands.test.ts` (9 tests) cover parse regex, author authorization, diff/metadata extraction, bot author verification, stale sha rejection, fork PR refusal, git apply & co-authored commit & push happy path, and reject comment update & memory recording. `tests/graph/nodes.test.ts` verifies report node skips previously rejected findings. All tests passing.
 
 ## E5.5 Workflow wiring (CI edit; ask first)
 **File:** `.github/workflows/CodeSentinel-mention.yml`
