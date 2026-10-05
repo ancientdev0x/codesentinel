@@ -1,0 +1,163 @@
+[
+  {
+    "file": "app/run.py",
+    "line": 5,
+    "cwe": "CWE-78",
+    "kind": "vuln",
+    "detector": "ast-grep,bandit,ruff"
+  },
+  {
+    "file": "app/store.py",
+    "line": 4,
+    "cwe": "CWE-502",
+    "kind": "vuln",
+    "detector": "ast-grep,bandit,ruff"
+  },
+  {
+    "file": "app/config.py",
+    "line": 3,
+    "cwe": "CWE-798",
+    "kind": "vuln",
+    "detector": "bandit,ruff"
+  },
+  {
+    "file": "app/db.py",
+    "line": 2,
+    "cwe": "CWE-89",
+    "kind": "vuln",
+    "detector": "ast-grep,bandit,ruff"
+  },
+  {
+    "file": "app/calc.py",
+    "line": 2,
+    "cwe": "CWE-95",
+    "kind": "vuln",
+    "detector": "ast-grep,bandit,ruff"
+  },
+  {
+    "file": "app/yaml_load.py",
+    "line": 4,
+    "cwe": "CWE-502",
+    "kind": "vuln",
+    "detector": "ast-grep,bandit,ruff"
+  },
+  {
+    "file": "app/regress.py",
+    "line": 2,
+    "kind": "regression",
+    "detector": "ruff"
+  },
+  {
+    "file": "app/system_call.py",
+    "line": 4,
+    "cwe": "CWE-78",
+    "kind": "vuln",
+    "detector": "ast-grep,bandit"
+  },
+  {
+    "file": "app/fetch.py",
+    "line": 4,
+    "cwe": "CWE-295",
+    "kind": "vuln",
+    "detector": "ast-grep,bandit"
+  },
+  {
+    "file": "app/format_sql.py",
+    "line": 2,
+    "cwe": "CWE-89",
+    "kind": "vuln",
+    "detector": "ast-grep,bandit"
+  },
+  {
+    "file": "app/auth_logic.py",
+    "line": 2,
+    "cwe": "CWE-285",
+    "kind": "regression",
+    "detector": "llm"
+  },
+  {
+    "file": "app/data_validator.py",
+    "line": 2,
+    "cwe": "CWE-20",
+    "kind": "regression",
+    "detector": "llm"
+  },
+  {
+    "file": "app/clean_math.py",
+    "kind": "clean"
+  },
+  {
+    "file": "app/clean_utils.py",
+    "kind": "clean"
+  },
+  {
+    "file": "web/exec.ts",
+    "line": 7,
+    "cwe": "CWE-78",
+    "kind": "vuln",
+    "detector": "ast-grep"
+  },
+  {
+    "file": "web/eval.ts",
+    "line": 2,
+    "cwe": "CWE-95",
+    "kind": "vuln",
+    "detector": "ast-grep"
+  },
+  {
+    "file": "web/broken.ts",
+    "line": 2,
+    "kind": "regression",
+    "detector": "tsc"
+  },
+  {
+    "file": "web/db_query.ts",
+    "line": 2,
+    "cwe": "CWE-89",
+    "kind": "vuln",
+    "detector": "ast-grep"
+  },
+  {
+    "file": "web/render_html.ts",
+    "line": 2,
+    "cwe": "CWE-79",
+    "kind": "vuln",
+    "detector": "ast-grep"
+  },
+  {
+    "file": "web/api_key.ts",
+    "line": 2,
+    "cwe": "CWE-798",
+    "kind": "vuln",
+    "detector": "ast-grep"
+  },
+  {
+    "file": "web/eval_fn.ts",
+    "line": 3,
+    "cwe": "CWE-95",
+    "kind": "vuln",
+    "detector": "ast-grep"
+  },
+  {
+    "file": "web/exec_concat.ts",
+    "line": 4,
+    "cwe": "CWE-78",
+    "kind": "vuln",
+    "detector": "ast-grep"
+  },
+  {
+    "file": "web/permission.ts",
+    "line": 2,
+    "cwe": "CWE-285",
+    "kind": "regression",
+    "detector": "llm"
+  },
+  {
+    "file": "web/clean_format.ts",
+    "kind": "clean"
+  },
+  {
+    "file": "web/clean_sanitize.ts",
+    "kind": "clean"
+  }
+]

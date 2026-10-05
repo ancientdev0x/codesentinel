@@ -33,19 +33,31 @@ describe('makeRepo helper', () => {
     const changedFiles = stdout.trim().split('\n')
 
     const expectedFiles = [
+      'app/auth_logic.py',
+      'app/calc.py',
+      'app/clean_math.py',
+      'app/clean_utils.py',
+      'app/config.py',
+      'app/data_validator.py',
+      'app/db.py',
+      'app/fetch.py',
+      'app/format_sql.py',
+      'app/regress.py',
       'app/run.py',
       'app/store.py',
-      'app/config.py',
-      'app/db.py',
-      'app/calc.py',
+      'app/system_call.py',
       'app/yaml_load.py',
-      'app/regress.py',
-      'web/exec.ts',
-      'web/eval.ts',
+      'web/api_key.ts',
       'web/broken.ts',
-      'app/clean_math.py',
       'web/clean_format.ts',
       'web/clean_sanitize.ts',
+      'web/db_query.ts',
+      'web/eval.ts',
+      'web/eval_fn.ts',
+      'web/exec.ts',
+      'web/exec_concat.ts',
+      'web/permission.ts',
+      'web/render_html.ts',
     ]
 
     for (const expected of expectedFiles) {

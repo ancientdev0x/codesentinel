@@ -77,6 +77,7 @@ describe('runAstChecks (E2.4)', () => {
     const cleanFindings = findings.filter(
       (f) =>
         f.file.endsWith('clean_math.py') ||
+        f.file.endsWith('clean_utils.py') ||
         f.file.endsWith('clean_format.ts') ||
         f.file.endsWith('clean_sanitize.ts')
     )
