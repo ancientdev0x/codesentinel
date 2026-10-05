@@ -47,19 +47,36 @@ const createGithubReporter = (cfg: ReviewConfig): Reporter => {
       const line = endLine ?? startLine
       try {
         const multiLine = startLine && endLine && startLine !== endLine
-        const { data } = await octokit.rest.pulls.createReviewComment({
-          owner,
-          repo,
-          pull_number: prNumber,
-          commit_id,
-          body: comment,
-          path,
-          line,
-          ...(multiLine
-            ? { start_line: startLine, start_side: 'RIGHT', side: 'RIGHT' }
-            : {}),
-        })
-        return data.html_url
+        try {
+          const { data } = await octokit.rest.pulls.createReviewComment({
+            owner,
+            repo,
+            pull_number: prNumber,
+            commit_id,
+            body: comment,
+            path,
+            line,
+            ...(multiLine
+              ? { start_line: startLine, start_side: 'RIGHT', side: 'RIGHT' }
+              : {}),
+          })
+          return data.html_url
+        } catch (error) {
+          if (multiLine) {
+            // If multi-line comment failed because start_line was not in hunk, retry on single line
+            const { data } = await octokit.rest.pulls.createReviewComment({
+              owner,
+              repo,
+              pull_number: prNumber,
+              commit_id,
+              body: comment,
+              path,
+              line,
+            })
+            return data.html_url
+          }
+          throw error
+        }
       } catch (error) {
         // Surface the error to the model so it can adjust the line/path.
         throw new Error(

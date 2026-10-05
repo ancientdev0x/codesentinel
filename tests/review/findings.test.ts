@@ -6,6 +6,8 @@ import {
   type Finding,
   findingId,
   FindingSchema,
+  normalizeFinding,
+  normalizeFindingPath,
   onlyChanged,
 } from '../../src/review/findings'
 
@@ -201,6 +203,46 @@ describe('Finding model & helpers', () => {
       // Line 30-35 was pure deletion
       const f = makeFinding('app/run.py', 31, 33)
       expect(onlyChanged([f], changed)).toEqual([])
+    })
+  })
+
+  describe('normalizeFindingPath & normalizeFinding', () => {
+    it('normalizes absolute workspace paths to repo-relative paths', () => {
+      const workspace = '/tmp/codesentinel-pr-12345'
+      expect(normalizeFindingPath('/tmp/codesentinel-pr-12345/calc.py', workspace)).toBe(
+        'calc.py'
+      )
+      expect(
+        normalizeFindingPath('/tmp/codesentinel-pr-12345/app/calc.py', workspace)
+      ).toBe('app/calc.py')
+      expect(normalizeFindingPath('./app/calc.py', workspace)).toBe('app/calc.py')
+      expect(normalizeFindingPath('app/calc.py', workspace)).toBe('app/calc.py')
+    })
+
+    it('normalizes finding file path and recalculates finding ID', () => {
+      const workspace = '/tmp/codesentinel-pr-12345'
+      const finding: Finding = {
+        id: 'old-id',
+        source: 'ast-grep',
+        ruleId: 'py-eval-exec',
+        severity: 'high',
+        file: '/tmp/codesentinel-pr-12345/app/calc.py',
+        startLine: 2,
+        endLine: 2,
+        message: 'eval used',
+        status: 'confirmed',
+      }
+
+      const normalized = normalizeFinding(finding, workspace)
+      expect(normalized.file).toBe('app/calc.py')
+      expect(normalized.id).toBe(
+        findingId({
+          source: 'ast-grep',
+          ruleId: 'py-eval-exec',
+          file: 'app/calc.py',
+          startLine: 2,
+        })
+      )
     })
   })
 })

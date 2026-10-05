@@ -206,6 +206,12 @@ describe('materializePr', () => {
         { cwd: materialized.workspace }
       )
       expect(mergeBase.trim()).toBe(baseSha)
+
+      // Verify workspace permissions allow other users (docker analyzer uid 10001) to traverse & read
+      const wsStat = await stat(materialized.workspace)
+      expect(wsStat.mode & 0o005).toBe(0o005)
+      const fileStat = await stat(join(materialized.workspace, 'file.txt'))
+      expect(fileStat.mode & 0o004).toBe(0o004)
     } finally {
       await materialized.cleanup()
       // Verify workspace was removed

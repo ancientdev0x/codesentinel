@@ -308,4 +308,87 @@ describe('ReviewGraph nodes (E4.2)', () => {
     expect(update.recovery?.adjust?.timeoutMs).toBeGreaterThan(0)
     expect(update.handledErrorCount).toBe(1)
   })
+
+  it('validate node normalizes finding paths from absolute to repo-relative', async () => {
+    const tmpWs = '/tmp/codesentinel-pr-test'
+    const validateNode = validate()
+    const update = await validateNode({
+      ...baseState,
+      cfg: { ...baseCfg, workspace: tmpWs },
+      files: [
+        {
+          fileName: `${tmpWs}/app/calc.py`,
+          fileContent: 'def eval_code(x):\n  return eval(x)\n',
+          diff: '@@ -1,2 +1,2 @@\n+def eval_code(x):\n+  return eval(x)',
+          changedLines: [{ start: 1, end: 2 }],
+        },
+      ],
+      llmFindings: [
+        {
+          id: 'test-llm-1',
+          source: 'llm',
+          ruleId: 'CWE-95',
+          severity: 'high',
+          file: `${tmpWs}/app/calc.py`,
+          startLine: 2,
+          endLine: 2,
+          message: 'eval used',
+          status: 'confirmed',
+        },
+      ],
+      staticFindings: [
+        {
+          id: 'test-static-1',
+          source: 'ast-grep',
+          ruleId: 'py-eval-exec',
+          severity: 'high',
+          file: `${tmpWs}/app/calc.py`,
+          startLine: 2,
+          endLine: 2,
+          message: 'eval used',
+          status: 'confirmed',
+        },
+      ],
+      summary: 'Found eval vulnerability',
+    })
+
+    expect(update.errors).toHaveLength(0)
+    expect(update.llmFindings?.[0].file).toBe('app/calc.py')
+    expect(update.staticFindings?.[0].file).toBe('app/calc.py')
+  })
+
+  it('report node posts review comments using repo-relative paths', async () => {
+    const tmpWs = '/tmp/codesentinel-pr-test'
+    const postReviewComment = vi.fn().mockResolvedValue('url')
+    const postSummary = vi.fn().mockResolvedValue('url')
+    const reportNode = report({
+      createReporter: () => ({ postReviewComment, postSummary }) as any,
+    })
+
+    await reportNode({
+      ...baseState,
+      cfg: { ...baseCfg, workspace: tmpWs },
+      llmFindings: [
+        {
+          id: 'test-llm-1',
+          source: 'llm',
+          ruleId: 'CWE-95',
+          severity: 'high',
+          file: `${tmpWs}/app/calc.py`,
+          startLine: 2,
+          endLine: 2,
+          message: 'eval used',
+          status: 'confirmed',
+        },
+      ],
+      staticFindings: [],
+      summary: 'Summary text',
+    })
+
+    expect(postReviewComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filePath: 'app/calc.py',
+      })
+    )
+  })
 })

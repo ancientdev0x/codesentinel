@@ -1,6 +1,6 @@
 import type { LineRange } from '../../common/types'
 import type { ReviewFileWithDiff } from '../diff'
-import { type Finding, findingId, onlyChanged } from '../findings'
+import { type Finding, findingId, normalizeFindingPath, onlyChanged } from '../findings'
 import { buildSymbolName } from './fragments'
 import { langFor, nodeLineSpan, parseFile } from './parse'
 import { getRulesFor } from './rules'
@@ -9,7 +9,10 @@ import { getRulesFor } from './rules'
  * Runs AST-based security checks using ast-grep rules on changed files.
  * Restricts findings to changed lines and respects a 2s per-file timeout.
  */
-export const runAstChecks = (files: ReviewFileWithDiff[]): Finding[] => {
+export const runAstChecks = (
+  files: ReviewFileWithDiff[],
+  workspace?: string
+): Finding[] => {
   const allFindings: Finding[] = []
 
   for (const file of files) {
@@ -21,6 +24,8 @@ export const runAstChecks = (files: ReviewFileWithDiff[]): Finding[] => {
     if (!lang) {
       continue
     }
+
+    const normFilePath = normalizeFindingPath(file.fileName, workspace)
 
     const startTime = Date.now()
     let root
@@ -54,14 +59,14 @@ export const runAstChecks = (files: ReviewFileWithDiff[]): Finding[] => {
           id: findingId({
             source: 'ast-grep',
             ruleId: rule.id,
-            file: file.fileName,
+            file: normFilePath,
             startLine,
           }),
           source: 'ast-grep',
           ruleId: rule.id,
           severity: rule.severity,
           confidence: 'high',
-          file: file.fileName,
+          file: normFilePath,
           startLine,
           endLine,
           message: rule.message,
@@ -76,6 +81,8 @@ export const runAstChecks = (files: ReviewFileWithDiff[]): Finding[] => {
 
   const changedMap = new Map<string, LineRange[]>()
   for (const file of files) {
+    const norm = normalizeFindingPath(file.fileName, workspace)
+    changedMap.set(norm, file.changedLines)
     changedMap.set(file.fileName, file.changedLines)
   }
 

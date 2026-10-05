@@ -21,6 +21,8 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Agent, setGlobalDispatcher } from 'undici'
+setGlobalDispatcher(new Agent({ headersTimeout: 0, bodyTimeout: 0 }))
 import {
   renderFanoutWorkflow,
   renderQaWorkflow,
@@ -258,7 +260,7 @@ if (prUrl) {
   payloadObj.prUrl = prUrl
 }
 if (interactive) {
-  if (!process.stdin.isTTY) {
+  if (!process.stdin.isTTY && process.env.CODESENTINEL_FORCE_INTERACTIVE !== '1') {
     process.stderr.write(
       '[CodeSentinel] --interactive requested but not running in a TTY; falling back to suggest mode.\n'
     )
@@ -316,11 +318,18 @@ try {
     out.status === 'awaiting_approval' &&
     Array.isArray(out.patches)
   ) {
-    const readline = await import('node:readline/promises')
+    const readline = await import('node:readline')
     const rl = readline.createInterface({
       input: process.stdin,
-      output: process.stdout,
+      crlfDelay: Infinity,
     })
+    const it = rl[Symbol.asyncIterator]()
+    const askQuestion = async (prompt) => {
+      process.stdout.write(prompt)
+      const res = await it.next()
+      if (res.done) return 'q'
+      return (res.value ?? '').trim().toLowerCase()
+    }
     const { execSync } = await import('node:child_process')
     const fs = await import('node:fs/promises')
 
@@ -336,6 +345,7 @@ try {
       }
 
       const decisions = {}
+      let quit = false
       for (const patch of currentOut.patches) {
         process.stdout.write(
           `\n\x1b[1mPatch ${patch.id}\x1b[0m (${patch.file}) [+${patch.stats?.added ?? 0} -${patch.stats?.removed ?? 0}]:\n`
@@ -354,9 +364,7 @@ try {
 
         let answered = false
         while (!answered) {
-          const answer = (await rl.question('\n[a]pply / [r]eject / [e]dit / [q]uit: '))
-            .trim()
-            .toLowerCase()
+          const answer = await askQuestion('\n[a]pply / [r]eject / [e]dit / [q]uit: ')
           if (answer === 'a' || answer === 'apply') {
             decisions[patch.id] = 'approve'
             answered = true
@@ -383,12 +391,14 @@ try {
               )
             }
           } else if (answer === 'q' || answer === 'quit') {
-            rl.close()
-            shutdown()
-            process.exit(0)
+            quit = true
+            break
           } else {
             process.stdout.write('Please enter a, r, e, or q.\n')
           }
+        }
+        if (quit) {
+          break
         }
       }
 
@@ -411,6 +421,10 @@ try {
             : resumeParsed
       } catch {
         currentOut = null
+      }
+
+      if (quit) {
+        break
       }
     }
 

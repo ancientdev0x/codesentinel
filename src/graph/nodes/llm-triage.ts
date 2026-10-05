@@ -74,6 +74,7 @@ export const llmTriage = (deps: LlmTriageDeps = {}) => {
             ...f,
             status: decision.decision === 'confirm' ? 'confirmed' : 'dismissed',
             rationale: decision.rationale,
+            fix: decision.fix ?? f.fix,
           }
         }
         return f

@@ -54,6 +54,64 @@ export const findingId = (f: Pick<Finding, 'source' | 'ruleId' | 'file' | 'start
     .digest('hex')
     .slice(0, 12)
 
+/**
+ * Normalizes a finding file path to be repo-relative.
+ * Removes leading slashes, `./`, and workspace root prefixes.
+ */
+export const normalizeFindingPath = (filePath: string, workspace?: string): string => {
+  let p = filePath.replace(/\\/g, '/').trim()
+  if (workspace) {
+    const normWs = workspace.replace(/\\/g, '/').replace(/\/+$/, '')
+    if (p.startsWith(`${normWs}/`)) {
+      p = p.slice(normWs.length + 1)
+    } else if (p === normWs) {
+      p = ''
+    } else if (p.startsWith('/')) {
+      // If path is absolute but workspace prefix wasn't direct match, compute relative
+      const wsSegments = normWs.split('/').filter(Boolean)
+      const pSegments = p.split('/').filter(Boolean)
+      let common = 0
+      while (
+        common < wsSegments.length &&
+        common < pSegments.length &&
+        wsSegments[common] === pSegments[common]
+      ) {
+        common++
+      }
+      if (common > 0 && common === wsSegments.length) {
+        p = pSegments.slice(common).join('/')
+      }
+    }
+  }
+  while (p.startsWith('./')) {
+    p = p.slice(2)
+  }
+  if (p.startsWith('/')) {
+    p = p.slice(1)
+  }
+  return p
+}
+
+/**
+ * Normalizes a finding's file path to be repo-relative and recomputes its ID if needed.
+ */
+export const normalizeFinding = (finding: Finding, workspace?: string): Finding => {
+  const normFile = normalizeFindingPath(finding.file, workspace)
+  if (normFile === finding.file) {
+    return finding
+  }
+  return {
+    ...finding,
+    file: normFile,
+    id: findingId({
+      source: finding.source,
+      ruleId: finding.ruleId,
+      file: normFile,
+      startLine: finding.startLine,
+    }),
+  }
+}
+
 /** Same file + overlapping lines + same CWE (or same rule) → keep highest severity, merge sources in message. */
 export const dedupeFindings = (all: Finding[]): Finding[] => {
   const result: Finding[] = []

@@ -1,6 +1,6 @@
 import path from 'node:path'
 import * as v from 'valibot'
-import { FindingSchema, type Finding } from '../../review/findings'
+import { FindingSchema, type Finding, normalizeFinding } from '../../review/findings'
 import { buildPatch, type Patch } from '../../review/patch'
 import type { ReviewStateType, ReviewStateUpdate, StageError } from '../state'
 import type { ReviewFileWithDiff } from '../../review/diff'
@@ -29,17 +29,27 @@ export const validate = (deps?: ValidateDeps) => {
 
     const errors: StageError[] = []
     const validLlmFindings: Finding[] = []
+    const workspace = state.cfg?.workspace
+
+    // Normalize every finding path to be repo-relative before validate/report
+    const normalizedLlmFindings = (state.llmFindings ?? []).map((f) =>
+      normalizeFinding(f, workspace)
+    )
+    const normalizedStaticFindings = (state.staticFindings ?? []).map((f) =>
+      normalizeFinding(f, workspace)
+    )
+
     const fileMap = new Map<string, ReviewFileWithDiff>()
     for (const f of state.files) {
       fileMap.set(f.fileName, f)
-      if (state.cfg?.workspace) {
-        fileMap.set(path.relative(state.cfg.workspace, f.fileName), f)
-        fileMap.set(path.resolve(state.cfg.workspace, f.fileName), f)
+      if (workspace) {
+        fileMap.set(path.relative(workspace, f.fileName), f)
+        fileMap.set(path.resolve(workspace, f.fileName), f)
       }
     }
 
     // 1 & 2 & 3: Validate LLM-produced findings
-    for (const finding of state.llmFindings) {
+    for (const finding of normalizedLlmFindings) {
       const parsed = v.safeParse(FindingSchema, finding)
       if (!parsed.success) {
         errors.push({
@@ -103,7 +113,7 @@ export const validate = (deps?: ValidateDeps) => {
 
     // 4. Pre-detected findings with severity >= medium must be triaged
     const highSeverityLevels = new Set(['critical', 'high', 'medium'])
-    for (const finding of state.staticFindings) {
+    for (const finding of normalizedStaticFindings) {
       if (highSeverityLevels.has(finding.severity)) {
         if (finding.status === 'candidate') {
           errors.push({
@@ -127,6 +137,7 @@ export const validate = (deps?: ValidateDeps) => {
 
     return {
       llmFindings: validLlmFindings,
+      staticFindings: normalizedStaticFindings,
       errors,
       attempts,
     }

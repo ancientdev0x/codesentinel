@@ -1,5 +1,5 @@
 import { createReporter } from '../../github/reporter'
-import { dedupeFindings } from '../../review/findings'
+import { dedupeFindings, normalizeFinding } from '../../review/findings'
 import { getRejectedIds } from '../../review/patch-commands'
 import type { ReviewStateType, ReviewStateUpdate } from '../state'
 
@@ -47,7 +47,7 @@ export const report = (deps: ReportDeps = {}) => {
       ...confirmedStatic,
       ...validLlm,
       ...unconfirmedStatic,
-    ])
+    ]).map((f) => normalizeFinding(f, state.cfg?.workspace))
 
     // Post inline review comments for all reportable findings
     for (const finding of allFindings) {
