@@ -295,4 +295,90 @@ describe('E5.2 human_review node with LangGraph interrupt()', () => {
     expect(step2Result.applied).toContain(patchId)
     /* eslint-enable @typescript-eslint/no-explicit-any */
   })
+
+  it('handles hitlMode "terminal" by reading terminal decisions and applying approved patches directly', async () => {
+    const filePath = 'hello.ts'
+    const fullPath = path.join(tmpRepo, filePath)
+    await fs.writeFile(fullPath, 'export const val = 100\n', 'utf8')
+    execSync('git add . && git commit -m "initial"', { cwd: tmpRepo })
+
+    const runId = 'hitl-thread-terminal'
+    process.env.CodeSentinel_RUN_ID = runId
+    const collector = getOrCreateCollector(runId)
+    collector.clear()
+
+    const cfg: ReviewConfig = {
+      platform: 'local',
+      model: 'test/fake',
+      thinkingLevel: 'off',
+      reviewLanguage: 'English',
+      ignore: [],
+      telemetry: false,
+      staticAnalysis: false,
+      sandbox: 'none',
+      analyzerTimeoutMs: 1000,
+      astChecks: false,
+      hitlMode: 'terminal',
+      maxAttempts: 3,
+      workspace: tmpRepo,
+    }
+
+    const graph = buildReviewGraph({
+      ingest: {
+        getChangedFiles: async () => ({
+          files: [
+            {
+              fileName: filePath,
+              status: 'modified',
+              additions: 1,
+              deletions: 1,
+              patch:
+                '@@ -1,1 +1,1 @@\n-export const val = 100\n+export const val = 500\n',
+              changedLines: [{ start: 1, end: 1 }],
+            },
+          ],
+        }),
+      },
+      llmTriage: {
+        session: { prompt: vi.fn().mockResolvedValue({ text: 'Summary' }) },
+        tracedPrompt: vi.fn().mockImplementation(async () => {
+          collector.recordFinding({
+            file: filePath,
+            startLine: 1,
+            endLine: 1,
+            severity: 'medium',
+            message: 'Update val to 500',
+            fix: {
+              replacement: 'export const val = 500',
+              startLine: 1,
+              endLine: 1,
+            },
+          })
+          return { text: 'Review completed summary' }
+        }),
+      },
+      humanReview: {
+        promptTerminalDecisions: async (_ws, patches) => {
+          const decisions: Record<string, 'approve'> = {}
+          for (const p of patches) {
+            decisions[p.id] = 'approve'
+          }
+          return decisions
+        },
+      },
+    })
+
+    const threadConfig = { configurable: { thread_id: runId } }
+
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const result: any = await graph.invoke({ cfg }, threadConfig)
+
+    // In terminal mode, no __interrupt__ is triggered because decisions were read directly
+    expect(result.__interrupt__).toBeUndefined()
+    expect(result.applied).toHaveLength(1)
+
+    const finalContent = await fs.readFile(fullPath, 'utf8')
+    expect(finalContent).toBe('export const val = 500\n')
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+  })
 })

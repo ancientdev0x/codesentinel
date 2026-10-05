@@ -39,7 +39,7 @@ export interface ReviewPayload {
   sandbox?: 'docker' | 'host' | 'auto'
   analyzerTimeoutMs?: number
   astChecks?: boolean
-  hitlMode?: 'off' | 'suggest' | 'interactive'
+  hitlMode?: 'off' | 'suggest' | 'interactive' | 'terminal'
   maxAttempts?: number
 }
 
@@ -68,7 +68,7 @@ export interface ReviewConfig {
   sandbox: 'docker' | 'host' | 'auto'
   analyzerTimeoutMs: number
   astChecks: boolean
-  hitlMode: 'off' | 'suggest' | 'interactive'
+  hitlMode: 'off' | 'suggest' | 'interactive' | 'terminal'
   maxAttempts: number
 }
 
@@ -178,6 +178,7 @@ export const resolveReviewConfig = (
       | 'off'
       | 'suggest'
       | 'interactive'
+      | 'terminal'
       | undefined) ??
     'suggest'
   const maxAttempts =

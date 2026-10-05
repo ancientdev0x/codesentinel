@@ -95,7 +95,7 @@ CodeSentinel emits OpenTelemetry spans for every LangGraph node, every tool invo
 | --- | --- | --- | --- |
 | `LANGFUSE_PUBLIC_KEY` | env | — | Langfuse project public API key (`pk-lf-...`). |
 | `LANGFUSE_SECRET_KEY` | env | — | Langfuse project secret API key (`sk-lf-...`). |
-| `LANGFUSE_BASEURL` | env | `https://cloud.langfuse.com` | Base URL for self-hosted or cloud Langfuse instance. |
+| `LANGFUSE_BASE_URL` | env | `https://cloud.langfuse.com` | Base URL for Langfuse cloud or self-hosted instance. Selects cloud region: EU default (`https://cloud.langfuse.com`), US (`https://us.cloud.langfuse.com`), or JP (`https://jp.cloud.langfuse.com`). Also accepts `LANGFUSE_BASEURL` or `LANGFUSE_HOST`. |
 | `CodeSentinel_TRACING` | env | `true` | `false` disables trace creation even if Langfuse keys are set. |
 | `CodeSentinel_DEBUG_LLM` | env | `0` | `1` enables outgoing LLM payload debug logs (model and reasoning effort). |
 

@@ -3,7 +3,9 @@ import { chmod, cp, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
 
+const currentDir = fileURLToPath(new URL('.', import.meta.url))
 const execFileAsync = promisify(execFile)
 
 export interface TestRepo {
@@ -20,8 +22,8 @@ export interface TestRepo {
 export const makeRepo = async (): Promise<TestRepo> => {
   const dir = await mkdtemp(join(tmpdir(), 'codesentinel-vuln-repo-'))
   await chmod(dir, 0o777)
-  const fixtureBase = join(__dirname, '../fixtures/vuln-repo/base')
-  const fixtureHead = join(__dirname, '../fixtures/vuln-repo/head')
+  const fixtureBase = join(currentDir, '../fixtures/vuln-repo/base')
+  const fixtureHead = join(currentDir, '../fixtures/vuln-repo/head')
 
   // 1. Copy base version
   await cp(fixtureBase, dir, { recursive: true })
