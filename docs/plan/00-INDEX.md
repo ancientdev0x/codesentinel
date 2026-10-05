@@ -87,8 +87,8 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E6.5 Subprocess spans (bandit/ruff/docker) with duration, exit, timeout flag
   - [x] E6.6 Strictness: schema-validated metadata, CI test that fails if a tool is unwrapped
 - [ ] **E7 Evaluation + metrics** (makes "identifying vulnerabilities" provable): [`E7-eval-and-metrics.md`](E7-eval-and-metrics.md) *(~1d, last)*
-  - [ ] E7.1 Ground-truth labels for the seeded fixtures
-  - [ ] E7.2 `npm run eval`: deterministic stage recall/precision (no LLM, runs in CI)
+  - [x] E7.1 Ground-truth labels for the seeded fixtures
+  - [x] E7.2 `npm run eval`: deterministic stage recall/precision (no LLM, runs in CI)
   - [ ] E7.3 Full-pipeline eval (LLM, manual run) → `docs/EVAL.md` with numbers + Langfuse cost/latency
 - [ ] **E8 Docs + resume sync**: [`E8-docs-and-resume.md`](E8-docs-and-resume.md) *(~0.5d)*
   - [ ] E8.1 README architecture + feature docs

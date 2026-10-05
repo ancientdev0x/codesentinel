@@ -47,6 +47,33 @@ Every capability claim is backed by a number you can reproduce. Interviewers tru
 Run `CodeSentinel review --pr <url>` (E1) on 3–5 real public Python PRs that later received security fixes. In `docs/EVAL.md`, record what it caught and what it missed, honestly. Interviewers love this section.
 
 ## Done when
+- [x] E7.1 Ground-truth labels for the seeded fixtures
+- [x] E7.2 `npm run eval`: deterministic stage recall/precision (no LLM, runs in CI)
+- [ ] E7.3 Full-pipeline eval (LLM, manual run) → `docs/EVAL.md` with numbers + Langfuse cost/latency
 - `npm run eval` is green in CI.
 - `docs/EVAL.md` has numbers from at least one full run.
 - Every number you plan to put on the resume appears in `docs/EVAL.md`.
+
+---
+
+## Verification (deterministic)
+
+### E7.1 Ground-truth labels (`tests/fixtures/vuln-repo.labels.json`)
+- Total items: 25 (18 deterministic vulnerabilities/regressions, 3 LLM-only regressions, 4 clean files).
+- Languages covered: Python, TypeScript.
+- CWEs covered: CWE-78, CWE-89, CWE-95, CWE-502, CWE-798, CWE-79, CWE-295, plus TypeScript compiler regressions and subtle logic inversions.
+- Unit verified via `tests/eval/labels.test.ts` (schema, uniqueness, and ground truth integrity).
+
+### E7.2 Deterministic eval engine (`npm run eval`)
+- Verified via `scripts/deterministic.ts` and `tests/eval/deterministic.test.ts`.
+- Results on `codesentinel-vuln-repo`:
+  | Detector | TP | FP | FN | Precision | Recall |
+  |---|---|---|---|---|---|
+  | ast-grep | 15 | 0 | 0 | 100.0% | 100.0% |
+  | bandit | 3 | 0 | 6 | 100.0% | 33.3% |
+  | ruff | 4 | 0 | 3 | 100.0% | 57.1% |
+  | tsc | 1 | 0 | 0 | 100.0% | 100.0% |
+  | **Union** | **18** | **0** | **0** | **100.0%** | **100.0%** |
+- Clean file findings: **0** (100% specificity on clean control files).
+- Union recall: **100%** (18/18 deterministic vulnerabilities caught, exceeding the 90% threshold).
+
