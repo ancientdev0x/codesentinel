@@ -26,7 +26,7 @@ export const extractAst = (deps: ExtractAstDeps = {}) => {
       }
 
       const fragments = doExtractFragments(state.files)
-      const astFindings = doRunAstChecks(state.files)
+      const astFindings = doRunAstChecks(state.files, state.cfg?.workspace)
 
       return {
         fragments,

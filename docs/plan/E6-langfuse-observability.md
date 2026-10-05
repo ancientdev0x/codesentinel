@@ -88,7 +88,10 @@ export const traced = <T extends ToolDef>(tool: T): T => ({
 - On completion, call `update({ output: truncatedText, usageDetails: { input, output, cache_read_input_tokens, cache_creation_input_tokens } }).end()`.
 - If flue only exposes usage per turn through events, emit one generation per model turn instead. That is more accurate, so prefer it when available.
 - If flue exposes **no** usage at all, stop and report this. Do not estimate tokens with a tokenizer and call it tracking.
-- **Accept:** a manual run shows token counts and cost in Langfuse for each `llm_triage` attempt (verified live on `https://jp.cloud.langfuse.com`, Trace ID `d7246cf849fec9afaa195669f5d15f24` with 3 generation observations capturing input/output/cache tokens, saved to `eval-results/langfuse-trace.json`).
+- **Accept:** a manual run shows token counts and cost in Langfuse for each `llm_triage` attempt (verified live on `https://jp.cloud.langfuse.com`, Trace ID `d7246cf849fec9afaa195669f5d15f24` with 3 generation observations capturing input/output/cache tokens, saved to `eval-results/langfuse-trace.json` via Langfuse API v2 observations endpoint):
+  - Generation 1 (`id: 8349e6bdde95dfcd`): model `openai-codex/gpt-5.6-luna`, latency `15.221s`, usage `{ input: 3251, output: 626, cache_read: 47104, total: 50981 }`
+  - Generation 2 (`id: 371cf07fbc593d76`): model `openai-codex/gpt-5.6-luna`, latency `39.849s`, usage `{ input: 4736, output: 1734, cache_read: 40960, total: 47430 }`
+  - Generation 3 (`id: 03144cf6be147c1c`): model `openai-codex/gpt-5.6-luna`, latency `117.618s`, usage `{ input: 23674, output: 5273, cache_read: 76800, total: 105747 }`
 
 ## E6.5 Subprocess spans
 In `runIsolated` (E3.1), wrap the call in `startObservation('subprocess.<tool>', …, { asType: 'tool' })` with metadata `{ backend, exitCode, status, timeoutMs, durationMs }`. A timeout gets `level: 'WARNING'`, and a crash gets `ERROR`.
@@ -101,7 +104,7 @@ Turn "strict" into something you can check:
 4. **Flush guarantee.** A test checks that `flushTracing` runs on both the success and the throw path of `review.ts`.
 
 ## Done when
-- [ ] E6.1–E6.6 are ticked (E6.1, E6.4 pending live run).
+- [x] E6.1–E6.6 are ticked.
 - [x] Strict test coverage and in-memory trace pipeline verification verified in CI suite.
 
 ## Deviations

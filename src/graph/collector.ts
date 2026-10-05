@@ -13,6 +13,7 @@ export interface RecordFindingParams {
 export interface TriageDecision {
   decision: 'confirm' | 'dismiss'
   rationale: string
+  fix?: { replacement: string; startLine: number; endLine: number }
 }
 
 export class Collector {
@@ -45,8 +46,13 @@ export class Collector {
     return id
   }
 
-  triageFinding(id: string, decision: 'confirm' | 'dismiss', rationale: string): void {
-    this.triageMap.set(id, { decision, rationale })
+  triageFinding(
+    id: string,
+    decision: 'confirm' | 'dismiss',
+    rationale: string,
+    fix?: { replacement: string; startLine: number; endLine: number }
+  ): void {
+    this.triageMap.set(id, { decision, rationale, fix })
   }
 
   getFindings(): Finding[] {

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { chmod, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -155,6 +155,9 @@ export const materializePr = async (
     pr.base.repo?.clone_url || `https://${ref.host}/${ref.owner}/${ref.repo}.git`
 
   const workspace = await mkdtemp(join(tmpdir(), 'codesentinel-pr-'))
+  // mkdtemp creates 0700 dirs by default. Docker container analyzer (uid 10001)
+  // mounts workspace as read-only and needs traversal and read permissions.
+  await chmod(workspace, 0o755)
 
   const runGit = async (
     args: string[],
@@ -204,6 +207,8 @@ export const materializePr = async (
     }
 
     await runGit(['checkout', '--detach', headSha])
+    // Ensure all checked out files and dirs are readable by others (docker uid 10001) without being writable
+    await execFileAsync('chmod', ['-R', 'a+rX,go-w', workspace])
 
     // Verify merge-base exists; if shallow history severed it, deepen and retry once
     let hasMergeBase = false

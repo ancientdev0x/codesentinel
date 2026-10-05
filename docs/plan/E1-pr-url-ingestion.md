@@ -59,7 +59,12 @@ Steps:
 - Parse `--pr <url>` and `--pr=<url>` in the bin, and put `prUrl` in the POST payload (around `bin/CodeSentinel.mjs:233`). Update `HELP`.
 - In the workflow (or in the E4 `ingest` node, which supersedes this): if `cfg.prUrl` is set, run `materializePr` and override `cfg.workspace`, `cfg.baseSha` and `cfg.headSha`. When `GITHUB_TOKEN` is present, also set `cfg.github = {owner, repo, prNumber, token}`.
 - Keep the existing behaviour unchanged when `prUrl` is absent.
-- **Accept:** `node bin/CodeSentinel.mjs review --pr <public PR url>` with no token writes a local report about that PR's files (verified live against `https://github.com/ancientdev0x/codesentinel-demo/pull/1`, output saved to `eval-results/remote-pr-run.log`).
+- **Accept:** `node bin/CodeSentinel.mjs review --pr <public PR url>` with token posts real inline comments on lines and a summary comment. Verified on `https://github.com/ancientdev0x/codesentinel-demo/pull/1`: 30 inline review comments posted on exact lines + 1 markdown summary comment posted via GitHub API.
+  - Sample comment 1 (`app/calc.py:2`): `**[HIGH]** Use of possibly insecure function; consider using \`ast.literal_eval\` (also reported by bandit) (CWE-78)`
+  - Sample comment 2 (`app/config.py:3`): `**[HIGH]** Possible hardcoded password assigned to: "password" (also reported by bandit) (CWE-259)`
+  - Sample comment 3 (`app/db.py:2`): `**[CRITICAL]** Possible SQL injection vector through string-based query construction (also reported by bandit) (CWE-89)`
+  - Summary: `## CodeSentinel Review` with analyzer report table (Bandit 11, Ruff 11, TSC 2) and "Review by CodeSentinel" link.
+
 
 ## E1.4 Reporter targeting [x]
 **Files:** `src/github/reporter.ts`, `src/review/config.ts`
