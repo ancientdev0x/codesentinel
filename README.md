@@ -2,11 +2,11 @@
 
 **Autonomous DevSecOps agent for pull requests — deterministic AST/SAST first, LLM triage, verified patches.**
 
-[![CI](https://github.com/ancientdev0x/CodeSentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/ancientdev0x/CodeSentinel/actions/workflows/ci.yml)
+[![CI](https://github.com/ancientdev0x/CodeSentinel/actions/workflows/pr.yml/badge.svg)](https://github.com/ancientdev0x/CodeSentinel/actions/workflows/pr.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Evaluated on Ground Truth](https://img.shields.io/badge/Benchmark-100%25%20Precision-brightgreen)](docs/EVAL.md)
 
-- **100% precision on benchmark:** 21/21 true positives, 0 false positives on clean control files across Python and TypeScript.
+- **Benchmarked on 25 labeled issues:** 100% precision and 95–100% recall across 3 live runs (96.8% avg), with 0 false positives on clean files; deterministic analyzers alone reach 18/18.
 - **Cyclic LangGraph state machine with automatic degradation:** Bounded retries — out-of-diff findings are self-corrected by re-prompting; analyzer timeouts are retried, then degraded gracefully so the review still completes.
 - **Patches validated before posting:** Surgical diffs tested with `git apply --check` and AST syntax checks; human-in-the-loop CLI (`--interactive`) and PR comments (`/codesentinel apply <id>`).
 
