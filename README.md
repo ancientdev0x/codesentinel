@@ -7,7 +7,7 @@
 [![Evaluated on Ground Truth](https://img.shields.io/badge/Benchmark-100%25%20Precision-brightgreen)](docs/EVAL.md)
 
 - **100% precision on benchmark:** 21/21 true positives, 0 false positives on clean control files across Python and TypeScript.
-- **Cyclic LangGraph state machine with automatic degradation:** Bounded retry and self-healing cycles for timeouts and out-of-diff errors (not a sequential prompt script).
+- **Cyclic LangGraph state machine with automatic degradation:** Bounded retries — out-of-diff findings are self-corrected by re-prompting; analyzer timeouts are retried, then degraded gracefully so the review still completes.
 - **Patches validated before posting:** Surgical diffs tested with `git apply --check` and AST syntax checks; human-in-the-loop CLI (`--interactive`) and PR comments (`/codesentinel apply <id>`).
 
 ---
@@ -26,7 +26,7 @@ npm run demo
 
 ## Architecture & Review Engine ⚙️
 
-CodeSentinel orchestrates reviews through a cyclic [LangGraph](https://github.com/langchain-ai/langgraphjs) state engine. Instead of dumping diffs into an LLM context window, it runs fast deterministic analyzers first, filters results through LLM triage, and isolates tool failures through bounded self-healing loops.
+CodeSentinel orchestrates reviews through a cyclic [LangGraph](https://github.com/langchain-ai/langgraphjs) state engine. Instead of dumping diffs into an LLM context window, it runs fast deterministic analyzers first, filters results through LLM triage, and isolates tool failures through bounded retries — out-of-diff findings are self-corrected by re-prompting; analyzer timeouts are retried, then degraded gracefully so the review still completes.
 
 ```mermaid
 flowchart TD
@@ -137,7 +137,7 @@ CodeSentinel_SANDBOX=host npx CodeSentinel review
 ```
 
 ### 4. Self-Correcting Cyclic Recovery
-When tools fail or LLMs hallucinate invalid line references, the LangGraph engine intercepts the error and heals automatically:
+When tools fail or LLMs hallucinate invalid line references, the LangGraph engine intercepts the error using bounded retries — out-of-diff findings are self-corrected by re-prompting; analyzer timeouts are retried, then degraded gracefully so the review still completes:
 
 | Error Kind | Cause | Self-Correction Recovery Action |
 |---|---|---|

@@ -24,9 +24,11 @@ CodeSentinel — Autonomous DevSecOps Review Agent | TypeScript, LangGraph, Dock
   TypeScript.
 • Ran Bandit and Ruff in network-less, read-only Docker sandboxes with hard timeouts;
   100% union recall (18/18) with 0 false positives on a seeded benchmark.
-• Orchestrated a cyclic LangGraph state engine that retries and gracefully degrades
-  failed stages; across 3 live runs on a 25-label benchmark, LLM triage reached 95–100%
-  recall at 100% precision and caught 7/9 subtle logic regressions (~90s median per review).
+• Orchestrated a cyclic LangGraph state engine with bounded retries — out-of-diff
+  findings are self-corrected by re-prompting; analyzer timeouts are retried, then
+  degraded gracefully so the review still completes; across 3 live runs on a 25-label
+  benchmark, LLM triage reached 95–100% recall at 100% precision and caught 7/9 subtle
+  logic regressions (~90s median per review).
 • Added human-in-the-loop patch approval (LangGraph interrupts + /codesentinel apply PR
   commands) producing git-apply-verified diffs, with OpenTelemetry/Langfuse tracing of
   tool latency and tokens.

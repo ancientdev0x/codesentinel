@@ -88,10 +88,10 @@ Static analyzers cannot detect business logic regressions that contain valid syn
 
 Across the 3 live benchmark runs (Runs 1, 2 & 3), 7 out of 9 logic regression opportunities were successfully detected (Run 1: 2/3, Run 2: 3/3, Run 3: 2/3).
 
-### Execution Under Timeout (Honest Self-Correction Account)
+### Execution Under Timeout (Honest Degradation Account)
 - In Run 2 and Run 3, `CodeSentinel_ANALYZER_TIMEOUT_MS=1` forced tool timeouts.
-- **Run 2 Result:** Timeout forced; static analysis degraded, LLM triage exhausted 3 attempts and degraded; review still completed with 21/21 via LLM. This is **not a successful recovery** (`selfCorrection.recovered = false`).
-- **Run 3 Result:** Demonstrates corrected real sequence logging with cycles (`ingest` → `extract_ast` → `static_analysis` → `failure_analysis` → `static_analysis` → `failure_analysis` → `llm_triage` → `validate` → `human_review` → `report`) and complete degraded tracking (`['bandit', 'ruff', 'tsc', 'static_analysis']`). Review completed with 20/21 via LLM. Not a successful recovery (`selfCorrection.recovered = false`).
+- **Run 2 Result:** Timeout forced; bounded retries — out-of-diff findings are self-corrected by re-prompting; analyzer timeouts are retried, then degraded gracefully so the review still completes (`selfCorrection.recovered = false`). Static analysis degraded, LLM triage exhausted 3 attempts and degraded; review still completed with 21/21 via LLM. This is **not a successful recovery**.
+- **Run 3 Result:** Demonstrates corrected real sequence logging with cycles (`ingest` → `extract_ast` → `static_analysis` → `failure_analysis` → `static_analysis` → `failure_analysis` → `llm_triage` → `validate` → `human_review` → `report`) and complete degraded tracking (`['bandit', 'ruff', 'tsc', 'static_analysis']`). Review completed with 20/21 via LLM. Bounded retries — out-of-diff findings are self-corrected by re-prompting; analyzer timeouts are retried, then degraded gracefully so the review still completes (`selfCorrection.recovered = false`). Not a successful recovery.
 
 ### Patch Generation & Quality
 - Generated patches are written to `.CodeSentinel/patches/<id>.patch`.

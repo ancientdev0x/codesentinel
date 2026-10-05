@@ -11,6 +11,7 @@ import {
   applyPatch,
   applyApproved,
   PatchError,
+  trimTrailingDuplicates,
 } from '../../src/review/patch'
 
 describe('E5.1 buildPatch', () => {
@@ -482,5 +483,75 @@ describe('E5.1 buildPatch', () => {
     await expect(buildPatch(tmpRepo, finding)).rejects.toSatisfy((err: unknown) => {
       return err instanceof PatchError && err.kind === 'invalid_syntax'
     })
+  })
+
+  it('trimTrailingDuplicates trims overlapping trailing lines', () => {
+    const repl = ['line1', 'line2', 'line3']
+    const follow = ['line3', 'line4']
+    expect(trimTrailingDuplicates(repl, follow)).toEqual(['line1', 'line2'])
+
+    const replMulti = ['a', 'b', 'c', 'd']
+    const followMulti = ['c', 'd', 'e']
+    expect(trimTrailingDuplicates(replMulti, followMulti)).toEqual(['a', 'b'])
+
+    const replNoMatch = ['a', 'b']
+    const followNoMatch = ['x', 'y']
+    expect(trimTrailingDuplicates(replNoMatch, followNoMatch)).toEqual(['a', 'b'])
+  })
+
+  it('trims trailing duplicate lines in replacement matching following file lines (auth_logic case)', async () => {
+    const filePath = 'app/auth_logic.py'
+    const fullPath = path.join(tmpRepo, filePath)
+    await fs.mkdir(path.dirname(fullPath), { recursive: true })
+    const originalContent =
+      'def authorize_action(user, action):\n' +
+      '    if not user.is_admin:\n' +
+      '        return True\n' +
+      '    return action in user.permissions\n'
+    await fs.writeFile(fullPath, originalContent, 'utf8')
+    execSync('git add . && git commit -m "initial auth_logic"', { cwd: tmpRepo })
+
+    // LLM suggests fix for L2-3 but includes the unchanged L4
+    const finding: Finding = {
+      id: 'f-auth-dup',
+      source: 'llm',
+      ruleId: 'CWE-862',
+      severity: 'critical',
+      file: filePath,
+      startLine: 2,
+      endLine: 3,
+      message: 'Reverse authorization guard',
+      status: 'confirmed',
+      fix: {
+        replacement:
+          '    if user.is_admin:\n' +
+          '        return True\n' +
+          '    return action in user.permissions',
+        startLine: 2,
+        endLine: 3,
+      },
+    }
+
+    const patch = await buildPatch(tmpRepo, finding)
+    expect(patch.file).toBe(filePath)
+
+    // Apply the patch
+    await applyPatch(tmpRepo, patch)
+
+    const updated = await fs.readFile(fullPath, 'utf8')
+    // Must NOT have duplicate "return action in user.permissions"
+    const occurrences = updated.split('return action in user.permissions').length - 1
+    expect(occurrences).toBe(1)
+    expect(updated).toBe(
+      'def authorize_action(user, action):\n' +
+        '    if user.is_admin:\n' +
+        '        return True\n' +
+        '    return action in user.permissions\n'
+    )
+
+    // Verify it compiles cleanly with python3
+    expect(() => {
+      execSync(`python3 -m py_compile "${fullPath}"`)
+    }).not.toThrow()
   })
 })

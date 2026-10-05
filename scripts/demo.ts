@@ -180,9 +180,22 @@ function printDemoOutput(data: {
   console.log(
     `  ${green}✔${reset} ast-grep (AST): in-process structural analysis (${data.findings.filter((f) => f.source === 'ast-grep').length} findings)`
   )
+  let hasUnavailable = false
   for (const r of data.staticReports) {
+    if (r.status === 'unavailable' || r.status === 'failed') {
+      hasUnavailable = true
+      console.log(
+        `  ${yellow}⚠${reset} ${r.tool} (static): ${yellow}unavailable${reset} (${r.findings} findings)`
+      )
+    } else {
+      console.log(
+        `  ${green}✔${reset} ${r.tool} (static): ${r.status} (${r.findings} findings)`
+      )
+    }
+  }
+  if (hasUnavailable) {
     console.log(
-      `  ${green}✔${reset} ${r.tool} (static): ${r.status} (${r.findings} findings)`
+      `  ${dim}Install Docker (npm run build:analyzers) or \`pipx install bandit ruff\` for full SAST coverage${reset}`
     )
   }
   console.log()
