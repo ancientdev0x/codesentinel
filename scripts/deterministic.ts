@@ -210,7 +210,7 @@ export async function runDeterministicEval(
       await fsp.mkdir(outDir, { recursive: true })
       await fsp.writeFile(
         path.join(outDir, 'deterministic.json'),
-        JSON.stringify(report, null, 2),
+        JSON.stringify(report, null, 2) + '\n',
         'utf8'
       )
     } catch {

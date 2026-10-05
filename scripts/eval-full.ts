@@ -100,9 +100,22 @@ export const loadLabels = (): GroundTruthLabel[] => {
   )
 }
 
+export const normalizeFindingFilePath = (filePath: string, repoDir?: string): string => {
+  let norm = filePath.replace(/\\/g, '/')
+  if (repoDir) {
+    const normRepo = repoDir.replace(/\\/g, '/').replace(/\/$/, '')
+    if (norm.startsWith(normRepo + '/')) {
+      norm = norm.slice(normRepo.length + 1)
+    }
+  }
+  norm = norm.replace(/^.*\/codesentinel-vuln-repo-[^/]+\//, '')
+  return norm
+}
+
 export const scoreFindings = (
   confirmedFindings: Finding[],
-  labels: GroundTruthLabel[]
+  labels: GroundTruthLabel[],
+  repoDir?: string
 ) => {
   const vulnLabels = labels.filter((l) => l.kind === 'vuln')
   const regressionLabels = labels.filter((l) => l.kind === 'regression')
@@ -117,7 +130,8 @@ export const scoreFindings = (
   let duplicateCount = 0
 
   for (const finding of confirmedFindings) {
-    const normFile = finding.file.replace(/\\/g, '/')
+    const relFile = normalizeFindingFilePath(finding.file, repoDir)
+    const normFile = relFile
 
     // 1. Clean file check -> strict FP
     const inCleanFile = cleanLabels.some((cl) =>
@@ -127,6 +141,7 @@ export const scoreFindings = (
       fpCount++
       scoredFindings.push({
         ...finding,
+        file: relFile,
         matchStatus: 'clean_file_false_positive',
         isTP: false,
         isFP: true,
@@ -152,6 +167,7 @@ export const scoreFindings = (
       fpCount++
       scoredFindings.push({
         ...finding,
+        file: relFile,
         matchStatus: 'unmatched',
         isTP: false,
         isFP: true,
@@ -166,6 +182,7 @@ export const scoreFindings = (
       duplicateCount++
       scoredFindings.push({
         ...finding,
+        file: relFile,
         matchStatus: `duplicate of ${labelKey}`,
         isTP: false,
         isFP: false,
@@ -176,6 +193,7 @@ export const scoreFindings = (
       tpCount++
       scoredFindings.push({
         ...finding,
+        file: relFile,
         matchStatus: labelKey,
         isTP: true,
         isFP: false,
@@ -382,7 +400,7 @@ export const runSingleLiveEval = async (
   }
 
   // Score findings against labels
-  const scored = scoreFindings(confirmedFindings, labels)
+  const scored = scoreFindings(confirmedFindings, labels, repo.dir)
 
   // Extract real ordered node sequence with cycles preserved
   const nodeSequence: string[] =
