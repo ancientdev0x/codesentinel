@@ -214,6 +214,66 @@ describe('ReviewGraph nodes (E4.2)', () => {
     }
   })
 
+  it('report node formats deterministic findings table and skips "see the inline comments" when llm_triage is degraded', async () => {
+    let capturedSummary = ''
+    const postReviewComment = vi.fn().mockResolvedValue('url')
+    const postSummary = vi.fn().mockImplementation(async (text: string) => {
+      capturedSummary = text
+      return 'https://github.com/owner/repo/pull/1#issuecomment-1'
+    })
+    const node = report({
+      createReporter: () => ({ postReviewComment, postSummary }) as any,
+    })
+
+    const update = await node({
+      ...baseState,
+      degraded: ['llm_triage'],
+      summary: '',
+      staticFindings: [
+        {
+          id: 'f-cand-1',
+          source: 'bandit',
+          ruleId: 'B602',
+          severity: 'high',
+          file: 'app/run.py',
+          startLine: 5,
+          endLine: 5,
+          message: 'subprocess call with shell=True',
+          status: 'candidate',
+        },
+        {
+          id: 'f-cand-2',
+          source: 'bandit',
+          ruleId: 'B608',
+          severity: 'critical',
+          file: 'app/db.py',
+          startLine: 12,
+          endLine: 12,
+          message: 'SQL injection formatted query',
+          status: 'candidate',
+        },
+      ],
+      llmFindings: [],
+    })
+
+    expect(capturedSummary).not.toContain('see the inline comments')
+    expect(capturedSummary).toContain(
+      'LLM triage unavailable — showing deterministic analyzer findings only.'
+    )
+    expect(capturedSummary).toContain('| File:Line | Rule | Severity | Message |')
+    expect(capturedSummary).toContain(
+      '| app/db.py:12 | B608 | CRITICAL | SQL injection formatted query |'
+    )
+    expect(capturedSummary).toContain(
+      '| app/run.py:5 | B602 | HIGH | subprocess call with shell=True |'
+    )
+    expect(capturedSummary).toContain('> ⚠️ **Degraded components / tools**: llm_triage')
+
+    // Candidate findings are also posted as inline comments
+    expect(postReviewComment).toHaveBeenCalledTimes(2)
+    expect(update.summary).toBe(capturedSummary)
+  })
+
   it('llm_triage prompts active session and captures summary', async () => {
     const fakeSession = {
       prompt: vi.fn().mockResolvedValue({ text: 'Detailed review summary.' }),

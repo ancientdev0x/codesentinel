@@ -22,14 +22,34 @@ export const report = (deps: ReportDeps = {}) => {
       ? await getRejectedIds(state.cfg.workspace)
       : new Set<string>()
 
+    const isLlmTriageDegraded = state.degraded.includes('llm_triage')
+
+    const SEVERITY_RANK: Record<string, number> = {
+      critical: 4,
+      high: 3,
+      medium: 2,
+      low: 1,
+      info: 0,
+    }
+
     // Gather confirmed findings: confirmed static findings + valid LLM findings (skipping rejected)
     const confirmedStatic = state.staticFindings.filter(
       (f) => f.status === 'confirmed' && !rejectedIds.has(f.id)
     )
     const validLlm = (state.llmFindings ?? []).filter((f) => !rejectedIds.has(f.id))
-    const allFindings = dedupeFindings([...confirmedStatic, ...validLlm])
 
-    // Post inline review comments for all confirmed findings
+    // When LLM triage is degraded, report deterministic analyzer findings directly
+    const unconfirmedStatic = isLlmTriageDegraded
+      ? state.staticFindings.filter((f) => !rejectedIds.has(f.id))
+      : []
+
+    const allFindings = dedupeFindings([
+      ...confirmedStatic,
+      ...validLlm,
+      ...unconfirmedStatic,
+    ])
+
+    // Post inline review comments for all reportable findings
     for (const finding of allFindings) {
       let body = `**[${finding.severity.toUpperCase()}]** ${finding.message}`
       if (finding.cwe) {
@@ -69,9 +89,36 @@ export const report = (deps: ReportDeps = {}) => {
     }
 
     // Build final summary
-    let summaryText = state.summary.trim()
-    if (!summaryText) {
-      summaryText = 'CodeSentinel completed the review; see the inline comments.'
+    let summaryText = ''
+    if (isLlmTriageDegraded) {
+      summaryText =
+        'LLM triage unavailable — showing deterministic analyzer findings only.'
+      // Gather deterministic findings sorted by severity descending
+      const sortedDeterministic = [...state.staticFindings]
+        .filter((f) => !rejectedIds.has(f.id))
+        .sort(
+          (a, b) =>
+            (SEVERITY_RANK[b.severity?.toLowerCase()] ?? 0) -
+            (SEVERITY_RANK[a.severity?.toLowerCase()] ?? 0)
+        )
+      const top20 = dedupeFindings(sortedDeterministic).slice(0, 20)
+      if (top20.length > 0) {
+        const header =
+          '| File:Line | Rule | Severity | Message |\n| --- | --- | --- | --- |'
+        const rows = top20.map((f) => {
+          const loc = `${f.file}:${f.startLine ?? 0}`
+          const sev = (f.severity || 'medium').toUpperCase()
+          const rule = f.ruleId || f.cwe || f.source
+          const cleanMsg = f.message.replace(/\|/g, '\\|').replace(/\n/g, ' ')
+          return `| ${loc} | ${rule} | ${sev} | ${cleanMsg} |`
+        })
+        summaryText += `\n\n### Deterministic Analyzer Findings (Top ${top20.length})\n\n${header}\n${rows.join('\n')}`
+      }
+    } else {
+      summaryText = state.summary.trim()
+      if (!summaryText) {
+        summaryText = 'CodeSentinel completed the review; see the inline comments.'
+      }
     }
 
     if (state.degraded.length > 0) {

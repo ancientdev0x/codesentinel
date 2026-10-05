@@ -72,4 +72,17 @@ describe('formatAnalyzerReport and formatSummary', () => {
     const summaryEmpty = formatSummary('LGTM', [])
     expect(summaryEmpty).not.toContain('### Analyzer Report')
   })
+
+  it('uses clean CodeSentinel Review header and single plain signoff without sponsor branding', () => {
+    const summary = formatSummary('Looks good.')
+    expect(summary).toContain('## CodeSentinel Review')
+    expect(summary).toContain(
+      'Review by [CodeSentinel](https://github.com/ancientdev0x/CodeSentinel)'
+    )
+    expect(summary).not.toContain('General Summary')
+    expect(summary).not.toContain('🏴‍☠️')
+    expect(summary).not.toContain('YOUR COMPANY HERE')
+    expect(summary).not.toContain('sustain.dev')
+    expect(summary).not.toContain('<details>')
+  })
 })
