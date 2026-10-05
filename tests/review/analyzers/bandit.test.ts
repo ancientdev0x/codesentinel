@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parseBanditJson, runBandit } from '../../../src/review/analyzers/bandit'
-import { isDockerAvailable } from '../../../src/sandbox/docker'
+import { isDockerAvailable, isDockerImageAvailable } from '../../../src/sandbox/docker'
 
-const dockerAvailable = await isDockerAvailable()
+const dockerAvailable = (await isDockerAvailable()) && (await isDockerImageAvailable())
 
 describe('Bandit adapter (E3.3)', () => {
   it('parses real Bandit output fixture and maps to Finding models', () => {

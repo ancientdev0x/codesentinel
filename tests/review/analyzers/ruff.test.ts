@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { parseBanditJson } from '../../../src/review/analyzers/bandit'
 import { parseRuffJson, runRuff } from '../../../src/review/analyzers/ruff'
 import { dedupeFindings } from '../../../src/review/findings'
-import { isDockerAvailable } from '../../../src/sandbox/docker'
+import { isDockerAvailable, isDockerImageAvailable } from '../../../src/sandbox/docker'
 
-const dockerAvailable = await isDockerAvailable()
+const dockerAvailable = (await isDockerAvailable()) && (await isDockerImageAvailable())
 
 describe('Ruff adapter (E3.4)', () => {
   it('parses real Ruff output fixture, maps to Finding models, tags regressions and fixes', () => {

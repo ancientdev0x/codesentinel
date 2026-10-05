@@ -67,27 +67,39 @@ export const isDockerAvailable = async (): Promise<boolean> => {
 }
 
 /**
+ * Checks if a specific Docker image is available locally.
+ */
+export const isDockerImageAvailable = async (
+  image: string = DOCKER_IMAGE
+): Promise<boolean> => {
+  try {
+    await execFileAsync('docker', ['image', 'inspect', image], { timeout: 5000 })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Checks if the analyzer image exists or attempts to build it if missing.
  */
 export const ensureDockerImage = async (
   image: string = DOCKER_IMAGE,
   timeoutMs = 180_000
 ): Promise<boolean> => {
+  if (await isDockerImageAvailable(image)) {
+    return true
+  }
+  // Try building image if inspect fails
   try {
-    await execFileAsync('docker', ['image', 'inspect', image], { timeout: 5000 })
+    await execFileAsync(
+      'docker',
+      ['build', '-t', image, '-f', 'docker/analyzers.Dockerfile', 'docker'],
+      { timeout: timeoutMs }
+    )
     return true
   } catch {
-    // Try building image if inspect fails
-    try {
-      await execFileAsync(
-        'docker',
-        ['build', '-t', image, '-f', 'docker/analyzers.Dockerfile', 'docker'],
-        { timeout: timeoutMs }
-      )
-      return true
-    } catch {
-      return false
-    }
+    return false
   }
 }
 

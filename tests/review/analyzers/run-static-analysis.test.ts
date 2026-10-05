@@ -1,10 +1,10 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isDockerAvailable } from '../../../src/sandbox/docker'
+import { isDockerAvailable, isDockerImageAvailable } from '../../../src/sandbox/docker'
 import { runStaticAnalysis } from '../../../src/review/analyzers'
 import type { ReviewConfig } from '../../../src/review/config'
 
-const dockerAvailable = await isDockerAvailable()
+const dockerAvailable = (await isDockerAvailable()) && (await isDockerImageAvailable())
 
 describe('runStaticAnalysis end-to-end against E0.5 fixture repo', () => {
   it.runIf(dockerAvailable)(

@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   buildDockerArgs,
   isDockerAvailable,
+  isDockerImageAvailable,
   runDocker,
   type DockerRunOptions,
 } from '../../src/sandbox/docker'
 import type { RunSpec } from '../../src/sandbox/run'
 
-const dockerAvailable = await isDockerAvailable()
+const dockerAvailable = (await isDockerAvailable()) && (await isDockerImageAvailable())
 
 describe('Docker sandbox (E3.2)', () => {
   it('buildDockerArgs contains every required security isolation flag', () => {

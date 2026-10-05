@@ -62,7 +62,10 @@ export const parsePrUrl = (raw: string): PrRef => {
     let host = 'github.com'
     if (process.env.GITHUB_API_URL) {
       try {
-        host = new URL(process.env.GITHUB_API_URL).hostname
+        const parsedHost = new URL(process.env.GITHUB_API_URL).hostname
+        if (parsedHost !== 'api.github.com') {
+          host = parsedHost
+        }
       } catch {
         // fallback to github.com
       }
