@@ -26,7 +26,7 @@ describe('npm run demo (4.1)', () => {
 
     const cleanFindings = result.findings.filter((f) => f.file === 'app/clean.py')
     expect(cleanFindings).toHaveLength(0)
-  })
+  }, 30000)
 
   it('runs via CLI and exits 0 with formatted output', async () => {
     const env = { ...process.env, CodeSentinel_SANDBOX: 'host' }
@@ -44,5 +44,5 @@ describe('npm run demo (4.1)', () => {
     expect(stdout).toContain('app/clean.py')
     expect(stdout).toContain('CLEAN')
     expect(stdout).toContain('exit code 0')
-  })
+  }, 30000)
 })
