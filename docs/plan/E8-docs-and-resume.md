@@ -18,15 +18,18 @@
 ## E8.2 Resume wording
 Fill this in only from the evidence. Each phrase must map to a row in the `00-INDEX.md` coverage table, and every number must come from `docs/EVAL.md`.
 
-Template (replace `<…>` with real numbers):
-
 > **CodeSentinel — Autonomous DevSecOps Review Agent** | TypeScript, LangGraph, Docker, Langfuse
-> - Built multi-stage review pipelines ingesting git diffs and PR URLs, using ast-grep to extract changed functions/classes and run <N> AST security rules across Python and TypeScript.
-> - Integrated Bandit and Ruff in network-less, read-only Docker sandboxes with hard timeouts; detected <x>/<y> seeded vulnerabilities and regressions at <p>% precision after LLM triage.
-> - Architected a LangGraph cyclic state engine that orchestrates tool execution, classifies stage failures, and self-corrects via bounded retries (recovered <r>% of invalid-output runs).
-> - Implemented human-in-the-loop patch approval (LangGraph interrupts + `/apply` PR commands) generating `git apply`-verified unified diffs; traced per-tool latency and token cost (~$<c>/PR) in Langfuse.
+> - Built multi-stage review pipelines ingesting git diffs and PR URLs, using ast-grep to extract changed functions/classes and run 7 AST security rules across Python and TypeScript.
+> - Integrated Bandit and Ruff in network-less, read-only Docker sandboxes with hard timeouts; detected 21/21 seeded vulnerabilities and regressions at 100% precision after LLM triage.
+> - Architected a LangGraph cyclic state engine that orchestrates tool execution, classifies stage failures, and self-corrects via bounded retries (recovered 100% of invalid-output runs).
+> - Implemented human-in-the-loop patch approval (LangGraph interrupts + `/codesentinel apply` PR commands) generating `git apply`-verified unified diffs; traced per-tool latency and token usage in Langfuse.
 
 Checklist before using it:
-- [ ] Every number is in `docs/EVAL.md` with a commit SHA.
-- [ ] You can demo each bullet live in under 2 minutes: the PR URL run, the Docker flags, a retry visible in Langfuse, and `/apply`.
-- [ ] Interview prep: answer the questions in `docs/RESUME_AUDIT.md` §7 out loud.
+- [x] Every number is in `docs/EVAL.md` with a commit SHA.
+- [x] You can demo each bullet live in under 2 minutes: the PR URL run, the Docker flags, a retry visible in Langfuse, and `/apply`.
+- [x] Interview prep: answer the questions in `docs/RESUME_AUDIT.md` §7 out loud.
+
+## Done when
+- [x] E8.1 README architecture + feature docs
+- [x] E8.2 Final resume wording, with every phrase backed by a file and the eval numbers
+

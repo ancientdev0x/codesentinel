@@ -87,6 +87,19 @@ code defaults, not documentation guesswork.
 client in `src/github/reporter.ts`). The workspace defaults to `GITHUB_WORKSPACE`
 (env) or `cwd` (local).
 
+## Langfuse Observability
+
+CodeSentinel emits OpenTelemetry spans for every LangGraph node, every tool invocation, and every sandboxed analyzer subprocess, exporting directly to Langfuse.
+
+| Variable | Source | Default | Notes |
+| --- | --- | --- | --- |
+| `LANGFUSE_PUBLIC_KEY` | env | — | Langfuse project public API key (`pk-lf-...`). |
+| `LANGFUSE_SECRET_KEY` | env | — | Langfuse project secret API key (`sk-lf-...`). |
+| `LANGFUSE_BASEURL` | env | `https://cloud.langfuse.com` | Base URL for self-hosted or cloud Langfuse instance. |
+| `CodeSentinel_TRACING` | env | `true` | `false` disables trace creation even if Langfuse keys are set. |
+| `CodeSentinel_DEBUG_LLM` | env | `0` | `1` enables outgoing LLM payload debug logs (model and reasoning effort). |
+
+
 ## QA configuration
 
 Resolved by `resolveQaConfig` (`src/qa/config.ts`). QA reuses the review settings

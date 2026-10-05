@@ -90,9 +90,9 @@ Tick these off as you go. Each `E*` heading links to its plan, and every leaf is
   - [x] E7.1 Ground-truth labels for the seeded fixtures
   - [x] E7.2 `npm run eval`: deterministic stage recall/precision (no LLM, runs in CI)
   - [x] E7.3 Full-pipeline eval (LLM, manual run) → `docs/EVAL.md` with numbers + Langfuse cost/latency
-- [ ] **E8 Docs + resume sync**: [`E8-docs-and-resume.md`](E8-docs-and-resume.md) *(~0.5d)*
-  - [ ] E8.1 README architecture + feature docs
-  - [ ] E8.2 Final resume wording, with every phrase backed by a file and the eval numbers
+- [x] **E8 Docs + resume sync**: [`E8-docs-and-resume.md`](E8-docs-and-resume.md) *(~0.5d)*
+  - [x] E8.1 README architecture + feature docs
+  - [x] E8.2 Final resume wording, with every phrase backed by a file and the eval numbers
 
 ### Dependency order
 

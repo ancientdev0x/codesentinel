@@ -5,12 +5,18 @@
 - `flue.config.ts` — `defineConfig({ target: 'node' })`.
 - `src/agents/reviewer.ts` — the review agent (`createAgent`): model, `local()` sandbox, instructions, and the `suggest_change` tool.
 - `src/workflows/review.ts` — the one-shot review workflow (`run({ init, payload, env })`); also exports `route` so the built server can serve `POST /workflows/review`.
+- `src/graph/` — LangGraph cyclic review state engine (`review-graph.ts`, `state.ts`, `nodes/*`, `collector.ts`).
+- `src/sandbox/` — Sandboxed execution runner (`run.ts`) with Docker containerization and host fallback.
+- `src/review/ast/` — AST-grep fragment extraction and structural security rules (`rules/*.yml`).
+- `src/review/analyzers/` — Static analysis adapters for Bandit, Ruff, and TypeScript.
+- `src/observability/` — OpenTelemetry & Langfuse tracing instrumentation (`langfuse.ts`, `trace.ts`, `tokens.ts`).
+- `docker/` — Sandboxed analyzer container (`docker/analyzers.Dockerfile`).
 - `src/tools/suggest-change.ts` — `defineTool` for inline review comments.
 - `src/review/` — `config.ts` (resolve config from payload/env), `diff.ts` (git diff + parsing), `instructions.ts` (review prompt + AGENTS.md/CLAUDE.md injection), `context.ts` (prompt builder), `constants.ts`, `prompt/fileInfo.ts`, `utils/filterFiles.ts`.
 - `tests/` — vitest specs (`*.test.ts`), mirroring the `src/` layout (kept out of `src/` so the package code stays clean).
 - `src/github/reporter.ts` — posts inline comments + summary to GitHub (Octokit) or to a local file.
 - `src/mcp/connect.ts` — connects remote MCP servers from config.
-- `src/common/` — shared `types.ts` and `formatting/summary.ts`.
+- `src/common/` — shared `types.ts`, `models.ts`, and `formatting/summary.ts`.
 - `action.yml` — composite GitHub Action. `docs/` — user docs (`docs/flue-migration.md` is the refactor log).
 
 ## Build, Test, and Development Commands
